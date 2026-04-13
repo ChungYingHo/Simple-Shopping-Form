@@ -3,7 +3,7 @@
 // ============================================================
 
 // ⚠️ 部署時請將此 URL 換成你的 Google Apps Script Web App URL
-const API_URL = 'YOUR_GAS_WEB_APP_URL_HERE';
+const API_URL = 'https://script.google.com/macros/s/AKfycbyfxkT_Eb8FCWfBaTJlMOcOiUQW25k7FoJ401VlHg5K75P_ZbgXxJeRLjuC_EB5tpkDoQ/exec';
 
 // 全域狀態
 let productsData = [];
