@@ -46,5 +46,20 @@
 - **後端**：Google Apps Script（Web App）
 - **資料庫**：Google Sheets
 - **託管**：GitHub Pages / Netlify
+- **E2E 測試**：Playwright（chromium + mobile Pixel 7）
 
 詳細架構與不變式請見 [CLAUDE.md](CLAUDE.md)。
+
+---
+
+## 跑測試
+
+```bash
+npm install                # 第一次裝 Playwright 與 http-server
+npx playwright install     # 第一次裝瀏覽器（~110MB）
+npm test                   # 跑所有 E2E
+npm run test:ui            # 互動式 UI 模式（推薦除錯時用）
+npm run test:headed        # 顯示瀏覽器執行過程
+```
+
+測試會 mock GAS API（**不會打到正式 sheet**），含 15 個測試案例覆蓋：商品載入、訂單流程、確認 modal、查詢、localStorage 帶入等。詳見 [tests/e2e/](tests/e2e/)。

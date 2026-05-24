@@ -1,0 +1,17 @@
+{
+  "name": "mango-order",
+  "version": "1.0.0",
+  "private": true,
+  "description": "何爸爸芒果訂購站 — E2E tests only (前端本身無 build step)",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "test:debug": "playwright test --debug",
+    "serve": "http-server -p 5173 -c-1 ."
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0",
+    "http-server": "^14.1.1"
+  }
+}

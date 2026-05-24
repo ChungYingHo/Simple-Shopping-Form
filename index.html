@@ -12,11 +12,19 @@
 </head>
 <body>
 
-  <!-- 全頁載入蓋版 -->
+  <!-- 全頁載入蓋版（初次進站） -->
   <div id="page-loader" class="page-loader" aria-live="polite" aria-busy="true">
     <div class="loader-content">
       <div class="loader-spinner" aria-hidden="true"></div>
       <p class="loader-text">準備芒果中…</p>
+    </div>
+  </div>
+
+  <!-- 送出訂單蓋版（避免送出時誤觸表單 / 重複送出） -->
+  <div id="submit-loader" class="page-loader submit-loader hidden" role="alert" aria-live="assertive" aria-busy="false">
+    <div class="loader-content">
+      <div class="loader-spinner" aria-hidden="true"></div>
+      <p class="loader-text">送出訂單中…</p>
     </div>
   </div>
 

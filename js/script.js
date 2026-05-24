@@ -151,6 +151,20 @@
     setTimeout(() => loader.remove(), 350);
   }
 
+  function showSubmitLoader() {
+    const el = document.getElementById('submit-loader');
+    if (!el) return;
+    el.classList.remove('hidden');
+    el.setAttribute('aria-busy', 'true');
+  }
+
+  function hideSubmitLoader() {
+    const el = document.getElementById('submit-loader');
+    if (!el) return;
+    el.classList.add('hidden');
+    el.setAttribute('aria-busy', 'false');
+  }
+
   function renderProducts() {
     const container = document.getElementById('products-container');
     container.innerHTML = '';
@@ -573,6 +587,7 @@
     const btn = document.getElementById('submit-btn');
     btn.classList.add('btn-loading');
     btn.disabled = true;
+    showSubmitLoader();
 
     const payload = {
       action: 'order',
@@ -607,6 +622,7 @@
         ? '送出逾時，請稍後再試'
         : (err.message || '送出失敗，請稍後再試'));
     } finally {
+      hideSubmitLoader();
       btn.classList.remove('btn-loading');
       btn.disabled = false;
     }

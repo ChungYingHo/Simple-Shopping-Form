@@ -989,6 +989,12 @@ textarea.form-input {
   pointer-events: none;
 }
 
+/* 送出訂單蓋版 — 需在 modal (z:200) 之上 */
+.submit-loader {
+  z-index: 300;
+  background: rgba(251, 245, 233, 0.92);
+}
+
 .loader-content {
   text-align: center;
 }

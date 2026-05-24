@@ -33,7 +33,18 @@ Data flow on order submit: client validates → opens confirm modal → POST `ac
 
 ## Working on it
 
-There is no build, lint, or test tooling. To preview the frontend, open `index.html` directly in a browser (the live `API_URL` in `js/script.js` points at a deployed GAS, so the page works as-is).
+No build or lint tooling. To preview the frontend, open `index.html` directly in a browser (the live `API_URL` in `js/script.js` points at a deployed GAS, so the page works as-is).
+
+### Tests
+
+E2E only, via Playwright. Tests mock the GAS endpoint (`page.route('https://script.google.com/**')`) so they never touch the live sheet.
+
+- `npm install` + `npx playwright install` (first time)
+- `npm test` — headless run (chromium + mobile-chrome projects)
+- `npm run test:ui` — interactive UI mode, best for debugging
+- Specs live in [tests/e2e/](tests/e2e/); shared API mock in [tests/fixtures/mock-api.js](tests/fixtures/mock-api.js)
+
+When you change `script.js` selectors / IDs / dataset attributes, the locators in the specs are the canary — run `npm test` before pushing.
 
 ### Deploying changes
 
