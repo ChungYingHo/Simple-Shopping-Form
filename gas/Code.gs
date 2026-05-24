@@ -415,8 +415,14 @@ function maskPhone(phone) {
 }
 
 // 台北市大安區忠孝東路100號 → 台北市大安區****
+// 屏東縣三地門鄉中正路1號 → 屏東縣三地門鄉****（避免 4 字鄉/區被切字）
+// 規則：保留到「縣市 + 區/鄉/鎮/市」為止，街道號碼遮罩
 function maskAddress(addr) {
   if (!addr) return '';
+  // 匹配「X縣/X市」+「Y區/Y鄉/Y鎮/Y市」
+  const m = addr.match(/^(.+?[市縣].+?[區鄉鎮市])/);
+  if (m) return m[1] + '****';
+  // 找不到行政區結構（罕見：跨國地址 / 自由輸入）→ fallback 前 6 字
   const chars = Array.from(addr);
   if (chars.length <= 6) return addr;
   return chars.slice(0, 6).join('') + '****';
