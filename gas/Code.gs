@@ -108,8 +108,9 @@ function getProducts() {
 // ---------- GET query ----------
 
 function queryOrders(phone) {
-  phone = String(phone).trim();
-  if (!phone) {
+  const normalize = s => String(s == null ? '' : s).replace(/\D/g, '').replace(/^0+/, '');
+  const queryPhone = normalize(phone);
+  if (!queryPhone) {
     return { success: false, error: '請輸入電話號碼' };
   }
 
@@ -126,8 +127,7 @@ function queryOrders(phone) {
 
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
-    const rowPhone = String(row[3]).trim();
-    if (rowPhone !== phone) continue;
+    if (normalize(row[3]) !== queryPhone) continue;
 
     const orderId = String(row[0]).trim();
     if (!ordersMap[orderId]) {
@@ -279,8 +279,16 @@ function createOrder(body) {
       item.spec,
       item.qty,
       item.amount,
-      '待付款',
+      '訂單確認中',
     ]);
+
+    // 強制電話/匯款末五碼為純文字，避免開頭 0 被 Sheets 吃掉
+    const lastRow = orderSheet.getLastRow();
+    orderSheet.getRange(lastRow, 4).setNumberFormat('@').setValue(buyerPhone);    // D 欄：訂購人電話
+    orderSheet.getRange(lastRow, 7).setNumberFormat('@').setValue(receiverPhone); // G 欄：收件人電話
+    if (bankCode) {
+      orderSheet.getRange(lastRow, 11).setNumberFormat('@').setValue(bankCode);   // K 欄：匯款後五碼
+    }
   }
 
   return { success: true, orderId: orderId, total: totalAmount };

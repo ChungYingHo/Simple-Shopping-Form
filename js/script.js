@@ -3,7 +3,7 @@
 // ============================================================
 
 // ⚠️ 部署時請將此 URL 換成你的 Google Apps Script Web App URL
-const API_URL = 'https://script.google.com/macros/s/AKfycbzV9_ZqIbSDidr7_AGtXmJakrhIKajU4MEStPvf0UFVMMBtcCCXk0xazUwZwHQdZQdt4A/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbwb7Ok_BZW1eLwpYOEbl4nME9o0F9NZvOSdn-tedjJhrKWpozybBwS0XQj17PCyMcniUg/exec';
 
 // 全域狀態
 let productsData = [];
