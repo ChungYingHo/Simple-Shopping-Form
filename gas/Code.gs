@@ -8,6 +8,19 @@ const SHEET_PRODUCTS = '商品';
 const SHEET_ORDERS = '訂單';
 const SHEET_SETTINGS = '設定';
 
+// 輸入長度上限（防 abuse）
+const MAX_NAME_LEN = 50;
+const MAX_PHONE_LEN = 20;
+const MAX_ADDRESS_LEN = 200;
+const MAX_NOTE_LEN = 500;
+const MAX_BANK_CODE_LEN = 10;
+const MAX_ITEMS = 20;
+
+// Rate limit
+const RATE_ORDER_WINDOW_SEC = 60;   // 同電話 60 秒內最多 1 單
+const RATE_QUERY_WINDOW_SEC = 60;   // 同電話 60 秒內最多 10 次查詢
+const RATE_QUERY_MAX = 10;
+
 // ---------- 路由 ----------
 
 function doGet(e) {
@@ -25,9 +38,7 @@ function doGet(e) {
       result = { success: false, error: '未知的 action' };
   }
 
-  return ContentService
-    .createTextOutput(JSON.stringify(result))
-    .setMimeType(ContentService.MimeType.JSON);
+  return jsonResponse(result);
 }
 
 function doPost(e) {
@@ -126,6 +137,15 @@ function queryOrders(phone) {
     return { success: false, error: '請輸入電話號碼' };
   }
 
+  // Rate limit（同電話 60 秒內最多 N 次）
+  const cache = CacheService.getScriptCache();
+  const rateKey = 'rate_query_' + queryPhone;
+  const count = parseInt(cache.get(rateKey) || '0', 10);
+  if (count >= RATE_QUERY_MAX) {
+    return { success: false, error: '查詢過於頻繁，請稍後再試' };
+  }
+  cache.put(rateKey, String(count + 1), RATE_QUERY_WINDOW_SEC);
+
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEET_ORDERS);
   const data = sheet.getDataRange().getValues();
@@ -147,12 +167,12 @@ function queryOrders(phone) {
       ordersMap[orderId] = {
         orderId: orderId,
         time: formatDate(row[1]),
-        buyerName: String(row[2]).trim(),
-        buyerPhone: String(row[3]).trim(),
-        buyerAddress: String(row[4]).trim(),
-        receiverName: String(row[5]).trim(),
-        receiverPhone: String(row[6]).trim(),
-        receiverAddress: String(row[7]).trim(),
+        buyerName: maskName(String(row[2]).trim()),
+        buyerPhone: maskPhone(String(row[3]).trim()),
+        buyerAddress: maskAddress(String(row[4]).trim()),
+        receiverName: maskName(String(row[5]).trim()),
+        receiverPhone: maskPhone(String(row[6]).trim()),
+        receiverAddress: maskAddress(String(row[7]).trim()),
         paymentMethod: String(row[9]).trim(),
         deliveryTime: String(row[8]).trim(),
         items: [],
@@ -176,10 +196,7 @@ function queryOrders(phone) {
     return b.orderId.localeCompare(a.orderId);
   });
 
-  if (orders.length === 0) {
-    return { success: false, error: '查無此電話的訂單紀錄' };
-  }
-
+  // 查無資料屬正常結果，不算錯誤
   return { success: true, data: orders };
 }
 
@@ -197,22 +214,28 @@ function createOrder(body) {
   if (!body.items || !Array.isArray(body.items) || body.items.length === 0) {
     return { success: false, error: '請至少選擇一項商品' };
   }
-
-  const paymentMethod = String(body.paymentMethod || '').trim();
-  if (paymentMethod !== '匯款' && paymentMethod !== '現金付款') {
-    return { success: false, error: '請選擇付款方式' };
+  if (body.items.length > MAX_ITEMS) {
+    return { success: false, error: '單筆訂單品項過多' };
   }
 
-  if (paymentMethod === '匯款') {
-    const bankCode = String(body.bankCode || '').trim();
-    if (!bankCode) {
-      return { success: false, error: '匯款付款請填寫匯款後五碼' };
-    }
+  // 匯款後五碼驗證（目前僅支援匯款）
+  const bankCodeRaw = String(body.bankCode || '').trim().substring(0, MAX_BANK_CODE_LEN);
+  if (!/^\d{5}$/.test(bankCodeRaw)) {
+    return { success: false, error: '匯款後五碼需為 5 位數字' };
+  }
+
+  // Rate limit：同電話 60 秒最多 1 單
+  const rawPhone = String(body.buyerPhone).trim();
+  const phoneKey = rawPhone.replace(/\D/g, '');
+  const cache = CacheService.getScriptCache();
+  const rateKey = 'rate_order_' + phoneKey;
+  if (cache.get(rateKey)) {
+    return { success: false, error: '訂單建立過於頻繁，請稍候 60 秒再試' };
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  // 讀商品價格
+  // 讀商品價格（金額一律以後端為準，前端 data-price 僅供顯示，不可信任）
   const prodSheet = ss.getSheetByName(SHEET_PRODUCTS);
   const prodData = prodSheet.getDataRange().getValues();
   const priceMap = {}; // { "愛文芒果": { "5": 450, "10": 850, "20": 1600 } }
@@ -236,7 +259,7 @@ function createOrder(body) {
   const validatedItems = [];
 
   for (const item of body.items) {
-    const product = String(item.product || '').trim();
+    const product = String(item.product || '').trim().substring(0, MAX_NAME_LEN);
     const spec = String(item.spec || '').trim();
     const qty = parseInt(item.qty, 10);
 
@@ -246,7 +269,7 @@ function createOrder(body) {
     if (!priceMap[product][spec]) {
       return { success: false, error: product + ' 無此規格：' + spec };
     }
-    if (!qty || qty < 1) {
+    if (!qty || qty < 1 || qty > 99) {
       return { success: false, error: '數量不正確：' + product };
     }
 
@@ -265,7 +288,7 @@ function createOrder(body) {
   // ----- 上鎖避免並發訂單號碰撞 / 列交錯 -----
   const lock = LockService.getScriptLock();
   try {
-    lock.waitLock(10000); // 最多等 10 秒
+    lock.waitLock(10000);
   } catch (_) {
     return { success: false, error: '系統忙碌中，請稍後再試' };
   }
@@ -278,56 +301,58 @@ function createOrder(body) {
     const now = new Date();
     const timeStr = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm');
 
-    const buyerName = String(body.buyerName).trim();
-    const buyerPhone = String(body.buyerPhone).trim();
-    const buyerAddress = String(body.buyerAddress).trim();
-    const receiverName = String(body.receiverName).trim();
-    const receiverPhone = String(body.receiverPhone).trim();
-    const receiverAddress = String(body.receiverAddress).trim();
-    const deliveryTime = String(body.deliveryTime || '不指定').trim();
-    const bankCode = paymentMethod === '匯款' ? String(body.bankCode || '').trim() : '';
-    const note = String(body.note || '').trim();
+    // 截斷各欄位至上限
+    const buyerName = String(body.buyerName).trim().substring(0, MAX_NAME_LEN);
+    const buyerPhone = String(body.buyerPhone).trim().substring(0, MAX_PHONE_LEN);
+    const buyerAddress = String(body.buyerAddress).trim().substring(0, MAX_ADDRESS_LEN);
+    const receiverName = String(body.receiverName).trim().substring(0, MAX_NAME_LEN);
+    const receiverPhone = String(body.receiverPhone).trim().substring(0, MAX_PHONE_LEN);
+    const receiverAddress = String(body.receiverAddress).trim().substring(0, MAX_ADDRESS_LEN);
+    const deliveryTime = String(body.deliveryTime || '不指定').trim().substring(0, 10);
+    const note = String(body.note || '').trim().substring(0, MAX_NOTE_LEN);
+    const paymentMethod = '匯款';
 
     const firstNewRow = orderSheet.getLastRow() + 1;
 
-    for (const item of validatedItems) {
-      orderSheet.appendRow([
-        orderId,
-        timeStr,
-        buyerName,
-        buyerPhone,
-        buyerAddress,
-        receiverName,
-        receiverPhone,
-        receiverAddress,
-        deliveryTime,
-        paymentMethod,
-        bankCode,
-        note,
-        item.product,
-        item.spec,
-        item.qty,
-        item.amount,
-        '訂單確認中',
-      ]);
+    // 一次寫入所有列（每筆品項一列）
+    const rows = validatedItems.map(item => ([
+      orderId,
+      timeStr,
+      buyerName,
+      buyerPhone,
+      buyerAddress,
+      receiverName,
+      receiverPhone,
+      receiverAddress,
+      deliveryTime,
+      paymentMethod,
+      bankCodeRaw,
+      note,
+      item.product,
+      item.spec,
+      item.qty,
+      item.amount,
+      '訂單確認中',
+    ]));
 
-      // 強制電話/匯款末五碼為純文字，避免開頭 0 被 Sheets 吃掉
-      const lastRow = orderSheet.getLastRow();
-      orderSheet.getRange(lastRow, 4).setNumberFormat('@').setValue(buyerPhone);    // D 欄：訂購人電話
-      orderSheet.getRange(lastRow, 7).setNumberFormat('@').setValue(receiverPhone); // G 欄：收件人電話
-      if (bankCode) {
-        orderSheet.getRange(lastRow, 11).setNumberFormat('@').setValue(bankCode);   // K 欄：匯款後五碼
-      }
-    }
+    orderSheet.getRange(firstNewRow, 1, rows.length, 17).setValues(rows);
 
-    // 交替底色，方便視覺區分不同訂單（同 orderId 永遠同色）
-    // 用訂單編號尾碼奇偶決定：粉黃 / 粉綠
-    // 只塗 A~P 欄（cols 1-16），避開 Q 欄（訂單狀態下拉色標）；R 欄（運送編號）也一起塗
+    // 強制電話/匯款末五碼為純文字格式，避免開頭 0 被 Sheets 吃掉
+    // （D=4 訂購人電話, G=7 收件人電話, K=11 匯款後五碼）
+    orderSheet.getRange(firstNewRow, 4, rows.length, 1).setNumberFormat('@');
+    orderSheet.getRange(firstNewRow, 7, rows.length, 1).setNumberFormat('@');
+    orderSheet.getRange(firstNewRow, 11, rows.length, 1).setNumberFormat('@');
+
+    // 交替底色（同 orderId 永遠同色）
+    // 只塗 A~P 欄 + R 欄，避開 Q 欄（訂單狀態下拉色標）
     const seqMatch = orderId.match(/-(\d+)$/);
     const seq = seqMatch ? parseInt(seqMatch[1], 10) : 0;
-    const bgColor = seq % 2 === 1 ? '#FFF8DC' : '#E8F5E9'; // 粉黃 / 粉綠
-    orderSheet.getRange(firstNewRow, 1, validatedItems.length, 16).setBackground(bgColor);
-    orderSheet.getRange(firstNewRow, 18, validatedItems.length, 1).setBackground(bgColor);
+    const bgColor = seq % 2 === 1 ? '#FFF8DC' : '#E8F5E9';
+    orderSheet.getRange(firstNewRow, 1, rows.length, 16).setBackground(bgColor);
+    orderSheet.getRange(firstNewRow, 18, rows.length, 1).setBackground(bgColor);
+
+    // 訂單成功後才設 rate limit token（失敗讓使用者可重試）
+    cache.put(rateKey, '1', RATE_ORDER_WINDOW_SEC);
   } finally {
     lock.releaseLock();
   }
@@ -343,14 +368,18 @@ function generateOrderId(ss) {
   const prefix = 'MG-' + dateStr + '-';
 
   const sheet = ss.getSheetByName(SHEET_ORDERS);
-  const data = sheet.getDataRange().getValues();
+  const lastRow = sheet.getLastRow();
   let maxSeq = 0;
 
-  for (let i = 1; i < data.length; i++) {
-    const id = String(data[i][0]);
-    if (id.startsWith(prefix)) {
-      const seq = parseInt(id.substring(prefix.length), 10);
-      if (seq > maxSeq) maxSeq = seq;
+  if (lastRow >= 2) {
+    // 只讀 A 欄（訂單編號），不需讀整張表
+    const ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (let i = 0; i < ids.length; i++) {
+      const id = String(ids[i][0]);
+      if (id.startsWith(prefix)) {
+        const seq = parseInt(id.substring(prefix.length), 10);
+        if (seq > maxSeq) maxSeq = seq;
+      }
     }
   }
 
@@ -363,4 +392,30 @@ function formatDate(val) {
     return Utilities.formatDate(val, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm');
   }
   return String(val);
+}
+
+// ---------- PII 遮罩 ----------
+
+// 王小明 → 王*明 ／ 王明 → 王* ／ 王 → 王
+function maskName(name) {
+  if (!name) return '';
+  const chars = Array.from(name); // 正確處理多 byte 字元
+  if (chars.length <= 1) return name;
+  if (chars.length === 2) return chars[0] + '*';
+  return chars[0] + '*'.repeat(chars.length - 2) + chars[chars.length - 1];
+}
+
+// 0912345678 → 0912***678
+function maskPhone(phone) {
+  if (!phone) return '';
+  if (phone.length <= 6) return phone;
+  return phone.substring(0, 4) + '***' + phone.substring(phone.length - 3);
+}
+
+// 台北市大安區忠孝東路100號 → 台北市大安區****
+function maskAddress(addr) {
+  if (!addr) return '';
+  const chars = Array.from(addr);
+  if (chars.length <= 6) return addr;
+  return chars.slice(0, 6).join('') + '****';
 }

@@ -35,14 +35,14 @@
     <!-- Tabs（置中） -->
     <nav class="tabs-wrap">
       <div class="tabs" role="tablist">
-        <button id="tab-order" class="tab-btn active" type="button" role="tab" aria-selected="true" aria-controls="section-order" onclick="switchTab('order')">訂購</button>
-        <button id="tab-query" class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="section-query" onclick="switchTab('query')">查詢訂單</button>
+        <button id="tab-order" class="tab-btn active" type="button" role="tab" aria-selected="true" aria-controls="section-order">訂購</button>
+        <button id="tab-query" class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="section-query">查詢訂單</button>
       </div>
     </nav>
 
     <!-- ==================== 訂購區 ==================== -->
     <main id="section-order" role="tabpanel" aria-labelledby="tab-order">
-      <form id="order-form" class="section" onsubmit="event.preventDefault(); submitOrder();" novalidate>
+      <form id="order-form" class="section" novalidate>
 
         <!-- 商品列表 -->
         <div id="products-container" class="section-stack"></div>
@@ -51,7 +51,7 @@
         <div id="products-error" class="hidden alert alert-error mt-14">
           <div class="error-actions">
             <p>商品載入失敗，請重新整理頁面</p>
-            <button type="button" onclick="location.reload()" class="btn btn-ghost">重新整理</button>
+            <button id="products-retry" type="button" class="btn btn-ghost">重新整理</button>
           </div>
         </div>
 
@@ -72,15 +72,15 @@
           <h3 class="card-title">訂購人資訊</h3>
           <div class="field">
             <label for="buyer-name" class="field-label">姓名 <span class="required">*</span></label>
-            <input type="text" id="buyer-name" class="form-input" placeholder="請輸入姓名" autocomplete="name">
+            <input type="text" id="buyer-name" class="form-input" placeholder="請輸入姓名" autocomplete="name" maxlength="50">
           </div>
           <div class="field">
             <label for="buyer-phone" class="field-label">電話 <span class="required">*</span></label>
-            <input type="tel" id="buyer-phone" class="form-input" placeholder="例：0912345678" autocomplete="tel">
+            <input type="tel" id="buyer-phone" class="form-input" placeholder="例：0912345678" autocomplete="tel" maxlength="20">
           </div>
           <div class="field">
             <label for="buyer-address" class="field-label">地址 <span class="required">*</span></label>
-            <input type="text" id="buyer-address" class="form-input" placeholder="請輸入地址" autocomplete="street-address">
+            <input type="text" id="buyer-address" class="form-input" placeholder="請輸入地址" autocomplete="street-address" maxlength="200">
           </div>
         </section>
 
@@ -94,15 +94,15 @@
           <div id="receiver-fields" class="hidden">
             <div class="field">
               <label for="receiver-name" class="field-label">收件人姓名 <span class="required">*</span></label>
-              <input type="text" id="receiver-name" class="form-input" placeholder="請輸入收件人姓名">
+              <input type="text" id="receiver-name" class="form-input" placeholder="請輸入收件人姓名" maxlength="50">
             </div>
             <div class="field">
               <label for="receiver-phone" class="field-label">收件人電話 <span class="required">*</span></label>
-              <input type="tel" id="receiver-phone" class="form-input" placeholder="例：0912345678">
+              <input type="tel" id="receiver-phone" class="form-input" placeholder="例：0912345678" maxlength="20">
             </div>
             <div class="field">
               <label for="receiver-address" class="field-label">收件地址 <span class="required">*</span></label>
-              <input type="text" id="receiver-address" class="form-input" placeholder="請輸入收件地址">
+              <input type="text" id="receiver-address" class="form-input" placeholder="請輸入收件地址" maxlength="200">
             </div>
           </div>
         </section>
@@ -136,8 +136,6 @@
             <h4>匯款帳號</h4>
             <p>銀行：<span id="bank-name-display">-</span> <span id="bank-branch-display"></span></p>
             <p>帳號：<span id="bank-account-display">-</span></p>
-            <!-- 戶名不顯示：ATM/網銀轉帳實際上不需要輸入戶名，避免畫面冗長。Sheet 的「匯款戶名」欄保留以供內部核對。 -->
-            <p id="bank-holder-row" class="hidden">戶名：<span id="bank-holder-display">-</span></p>
             <p id="payment-note-display" class="bank-note hidden"></p>
             <p class="bank-reminder">小提醒：匯款前再麻煩您核對一次訂單金額，會比較順利唷 ☺</p>
             <div class="field">
@@ -150,11 +148,11 @@
         <!-- 備註 -->
         <section class="card">
           <h3 class="card-title">備註</h3>
-          <textarea id="order-note" class="form-input" rows="3" placeholder="有什麼想跟我們說的嗎？（選填）"></textarea>
+          <textarea id="order-note" class="form-input" rows="3" placeholder="有什麼想跟我們說的嗎？（選填）" maxlength="500"></textarea>
         </section>
 
         <!-- 錯誤訊息 -->
-        <div id="order-error" class="hidden alert alert-error mt-14"></div>
+        <div id="order-error" class="hidden alert alert-error mt-14" role="alert" aria-live="polite"></div>
 
         <!-- 送出按鈕（桌機 / Enter 鍵 / fallback） -->
         <button id="submit-btn" type="submit" class="btn btn-primary btn-block btn-lg mt-24">
@@ -171,8 +169,8 @@
         <p class="order-id-line">訂單編號：<span id="success-order-id" class="id"></span></p>
         <p class="total-line" id="success-total"></p>
         <div class="btn-row">
-          <button type="button" onclick="resetForm()" class="btn btn-primary">繼續訂購</button>
-          <button type="button" onclick="switchTab('query')" class="btn btn-secondary">查詢訂單</button>
+          <button id="success-continue-btn" type="button" class="btn btn-primary">繼續訂購</button>
+          <button id="success-query-btn" type="button" class="btn btn-secondary">查詢訂單</button>
         </div>
       </div>
     </div>
@@ -181,8 +179,8 @@
     <section id="section-query" class="hidden section" role="tabpanel" aria-labelledby="tab-query">
       <div class="card">
         <h3 class="card-title">輸入電話號碼查詢訂單</h3>
-        <form class="query-row" onsubmit="event.preventDefault(); queryOrders();">
-          <input type="tel" id="query-phone" class="form-input" placeholder="例：0912345678" autocomplete="tel">
+        <form id="query-form" class="query-row">
+          <input type="tel" id="query-phone" class="form-input" placeholder="例：0912345678" autocomplete="tel" maxlength="20">
           <button id="query-btn" type="submit" class="btn btn-primary">查詢</button>
         </form>
       </div>
@@ -194,7 +192,7 @@
         </div>
       </div>
 
-      <div id="query-error" class="hidden alert alert-error mt-14"></div>
+      <div id="query-error" class="hidden alert alert-error mt-14" role="alert" aria-live="polite"></div>
       <div id="query-empty" class="hidden alert alert-empty mt-14">查無訂單紀錄</div>
       <div id="query-results" class="section-stack mt-14"></div>
     </section>
@@ -216,7 +214,7 @@
       <span class="bar-label">合計</span>
       <span id="floating-total" class="bar-total">$0</span>
     </div>
-    <button type="button" onclick="submitOrder()" class="btn btn-primary">送出訂單</button>
+    <button id="floating-submit-btn" type="submit" form="order-form" class="btn btn-primary">送出訂單</button>
   </div>
 
   <script src="js/script.js"></script>

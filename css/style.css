@@ -153,6 +153,7 @@ body {
   border-radius: var(--radius-sm);
   font-size: 13.5px;
   line-height: 1.6;
+  white-space: pre-line; /* 讓 Sheet 中的換行能正確顯示 */
 }
 
 /* ---------- Tabs ---------- */
@@ -796,8 +797,6 @@ textarea.form-input {
   gap: 10px;
   flex-wrap: wrap;
 }
-
-.track-box .track-title { display: none; }
 
 .track-box .track-number {
   margin: 0;
