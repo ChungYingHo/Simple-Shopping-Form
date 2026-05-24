@@ -192,7 +192,7 @@
       } else {
         const hint = document.createElement('p');
         hint.className = 'product-hint';
-        hint.textContent = '單價為一箱（含運費）';
+        hint.textContent = '單價為一箱（含運費，約 15–18 顆）';
         card.appendChild(hint);
 
         const specs = [
