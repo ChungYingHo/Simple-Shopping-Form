@@ -10,7 +10,7 @@
   --surface-alt:  #FFFBF2;
 
   --mango:        #E89232;
-  --mango-dark:   #B26715;
+  --mango-dark:   #9A5810;  /* AA pass on white (~5.4:1) */
   --mango-light:  #FCE3BE;
   --mango-50:     #FFF6E6;
 
@@ -86,10 +86,6 @@ html, body {
 }
 
 body {
-  background-image:
-    radial-gradient(circle at 0% 0%, rgba(232, 146, 50, 0.08) 0, transparent 40%),
-    radial-gradient(circle at 100% 100%, rgba(110, 139, 87, 0.06) 0, transparent 40%);
-  background-attachment: fixed;
   padding-bottom: 96px; /* 留空間給浮動 CTA */
 }
 
@@ -114,7 +110,7 @@ body {
   width: 48px;
   height: 1px;
   background: var(--mango);
-  opacity: 0.4;
+  opacity: 0.6;
 }
 
 .app-header .brand-mark {
@@ -131,9 +127,21 @@ body {
   font-family: var(--font-display);
   font-size: 28px;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
   color: var(--text);
   margin: 0;
+}
+
+.app-header .scarcity {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 12.5px;
+  letter-spacing: 0.08em;
+  color: var(--mango-dark);
+  background: var(--mango-50);
+  border: 1px solid var(--mango-light);
+  border-radius: 999px;
+  padding: 3px 12px;
 }
 
 .app-header .tagline {
@@ -209,17 +217,22 @@ body {
   margin: 0 0 14px;
   letter-spacing: 0.04em;
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: baseline;
+  gap: 10px;
 }
 
-.card-title::before {
-  content: "";
-  display: inline-block;
-  width: 3px;
-  height: 16px;
-  background: var(--mango);
-  border-radius: 2px;
+/* 表單區段序號（純文字 chip，無裝飾條紋） */
+.card-title .step-num {
+  font-family: "SF Mono", "Consolas", monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--mango-dark);
+  background: var(--mango-50);
+  padding: 2px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.02em;
+  line-height: 1.4;
+  flex-shrink: 0;
 }
 
 .required { color: var(--danger); margin-left: 2px; }
@@ -288,11 +301,11 @@ textarea.form-input {
 .btn:active { transform: translateY(1px); }
 
 .btn-primary {
-  background: linear-gradient(180deg, var(--mango) 0%, var(--mango-dark) 100%);
+  background: var(--mango-dark);
   color: #fff;
-  box-shadow: 0 6px 16px -6px rgba(178, 103, 21, 0.5);
+  box-shadow: 0 2px 6px -2px rgba(74, 50, 17, 0.25);
 }
-.btn-primary:hover { filter: brightness(1.04); }
+.btn-primary:hover { background: #874A0C; }
 
 .btn-secondary {
   background: var(--bg-soft);
@@ -367,7 +380,7 @@ textarea.form-input {
 }
 
 .product-hint {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-muted);
   margin: 0 0 10px;
   letter-spacing: 0.04em;
@@ -579,9 +592,7 @@ textarea.form-input {
   right: 0;
   bottom: 0;
   z-index: 50;
-  background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: var(--surface);
   border-top: 1px solid var(--border);
   padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
   display: flex;
@@ -689,8 +700,8 @@ textarea.form-input {
 }
 
 .order-card .order-time {
-  font-size: 12px;
-  color: var(--text-muted);
+  font-size: 13px;
+  color: var(--text-soft);
   margin: 0 0 14px;
   padding-bottom: 14px;
   border-bottom: 1px solid var(--border-soft);
@@ -785,12 +796,11 @@ textarea.form-input {
 /* 物流追蹤 — 改細條 inline 樣式 */
 .track-box {
   margin: 14px 0 10px;
-  padding: 8px 12px;
+  padding: 10px 12px;
   background: var(--info-bg);
-  border: 0;
-  border-left: 2px solid var(--info);
-  border-radius: 4px;
-  font-size: 12.5px;
+  border: 1px solid var(--info-border);
+  border-radius: 6px;
+  font-size: 13px;
   color: var(--text-soft);
   display: flex;
   align-items: center;
@@ -814,7 +824,7 @@ textarea.form-input {
   border-radius: 4px;
   color: var(--text);
   margin-left: 0;
-  font-size: 12.5px;
+  font-size: 13px;
 }
 
 .track-box .track-link {
@@ -823,7 +833,7 @@ textarea.form-input {
   text-decoration: none;
   border-bottom: 1px solid currentColor;
   padding-bottom: 1px;
-  font-size: 12.5px;
+  font-size: 13px;
 }
 .track-box .track-link:hover { opacity: 0.8; }
 
@@ -852,8 +862,8 @@ textarea.form-input {
 
 .order-card .order-meta {
   margin-top: 10px;
-  font-size: 12px;
-  color: var(--text-muted);
+  font-size: 13px;
+  color: var(--text-soft);
   letter-spacing: 0.04em;
 }
 
@@ -883,10 +893,9 @@ textarea.form-input {
 }
 
 .bank-box .bank-note {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--mango-dark);
   margin-top: 8px;
-  opacity: 0.85;
 }
 
 .bank-box .field {
@@ -897,10 +906,9 @@ textarea.form-input {
 .bank-box .bank-reminder {
   margin: 16px 0;
   padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.6);
-  border-left: 2px solid var(--mango);
-  border-radius: 4px;
-  font-size: 12.5px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 6px;
+  font-size: 13px;
   color: var(--mango-dark);
   line-height: 1.7;
 }
@@ -932,7 +940,10 @@ textarea.form-input {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 32px;
+}
+.success-card .check svg {
+  width: 32px;
+  height: 32px;
 }
 .success-card h2 {
   font-family: var(--font-display);
@@ -944,7 +955,7 @@ textarea.form-input {
 }
 .success-card .order-id-line {
   font-size: 14px;
-  color: var(--text-muted);
+  color: var(--text-soft);
   margin: 4px 0;
 }
 .success-card .order-id-line .id {
@@ -967,9 +978,6 @@ textarea.form-input {
   inset: 0;
   z-index: 100;
   background: var(--bg);
-  background-image:
-    radial-gradient(circle at 0% 0%, rgba(232, 146, 50, 0.10) 0, transparent 50%),
-    radial-gradient(circle at 100% 100%, rgba(110, 139, 87, 0.08) 0, transparent 50%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1045,10 +1053,10 @@ textarea.form-input {
 /* ---------- Footer ---------- */
 .app-footer {
   text-align: center;
-  font-size: 12px;
-  color: var(--text-muted);
+  font-size: 13px;
+  color: var(--text-soft);
   padding: 32px 16px 24px;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
 }
 
 .footer-line { margin: 0; line-height: 1.8; }
@@ -1071,13 +1079,14 @@ textarea.form-input {
 .same-buyer-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   margin-bottom: 14px;
   cursor: pointer;
-  font-size: 14px;
-  color: var(--text-soft);
+  font-size: 14.5px;
+  color: var(--text);
   user-select: none;
 }
+.same-buyer-row .spec-check { margin: 0; }
 
 .row-flex { display: flex; gap: 8px; }
 .row-flex > .form-input { flex: 1; }
@@ -1090,8 +1099,8 @@ textarea.form-input {
 .btn-row .btn { flex: 1; }
 
 .delivery-hint {
-  font-size: 12px;
-  color: var(--text-muted);
+  font-size: 13px;
+  color: var(--text-soft);
   margin: 10px 0 0;
   line-height: 1.6;
 }
@@ -1111,3 +1120,138 @@ textarea.form-input {
   padding-bottom: 1px;
 }
 .contact-link:hover { color: var(--mango); }
+
+/* ---------- 付款流程強調 box（先匯款 → 再下單） ---------- */
+.payment-flow-notice {
+  background: var(--surface);
+  border: 1px solid var(--mango-light);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.payment-flow-notice .flow-icon {
+  font-size: 18px;
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+.payment-flow-notice .flow-text {
+  font-size: 13.5px;
+  color: var(--text);
+  line-height: 1.6;
+}
+.payment-flow-notice .flow-text strong {
+  color: var(--mango-dark);
+  font-weight: 600;
+}
+
+/* ---------- Confirmation Modal ---------- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(42, 33, 24, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.modal-overlay.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.modal {
+  background: var(--surface);
+  border-radius: var(--radius);
+  max-width: 480px;
+  width: 100%;
+  max-height: 86vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-lg);
+  transform: translateY(8px) scale(0.98);
+  transition: transform 0.2s ease;
+}
+.modal-overlay.show .modal { transform: translateY(0) scale(1); }
+
+.modal-header {
+  padding: 20px 22px 12px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.modal-header h3 {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: 0.04em;
+}
+.modal-header p {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.modal-body {
+  padding: 16px 22px;
+  overflow-y: auto;
+  flex: 1;
+}
+.modal-section + .modal-section { margin-top: 16px; }
+.modal-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.1em;
+  margin: 0 0 6px;
+}
+.modal-section-body {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.6;
+}
+.modal-section-body .line { display: block; }
+.modal-section-body .line + .line { margin-top: 2px; }
+
+.modal-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.modal-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 14px;
+}
+.modal-item .name { color: var(--text); }
+.modal-item .amount { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.modal-total {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-soft);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.modal-total .label { font-size: 13px; color: var(--text-soft); letter-spacing: 0.08em; }
+.modal-total .amount {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--mango-dark);
+}
+
+.modal-footer {
+  padding: 14px 22px 20px;
+  display: flex;
+  gap: 10px;
+  border-top: 1px solid var(--border-soft);
+}
+.modal-footer .btn { flex: 1; }

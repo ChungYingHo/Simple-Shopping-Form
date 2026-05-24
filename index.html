@@ -25,6 +25,7 @@
     <span class="brand-mark">SEASONAL · MANGO</span>
     <h1>2026 何爸爸芒果</h1>
     <p class="tagline">夏日限定 · 直送到府</p>
+    <span id="scarcity-info" class="scarcity hidden"></span>
   </header>
 
   <div class="container">
@@ -42,6 +43,7 @@
 
     <!-- ==================== 訂購區 ==================== -->
     <main id="section-order" role="tabpanel" aria-labelledby="tab-order">
+      <h2 class="visually-hidden" style="position:absolute;left:-9999px;">訂購表單</h2>
       <form id="order-form" class="section" novalidate>
 
         <!-- 商品列表 -->
@@ -69,7 +71,7 @@
 
         <!-- 訂購人資訊 -->
         <section class="card mt-20">
-          <h3 class="card-title">訂購人資訊</h3>
+          <h3 class="card-title"><span class="step-num">1</span>訂購人資訊</h3>
           <div class="field">
             <label for="buyer-name" class="field-label">姓名 <span class="required">*</span></label>
             <input type="text" id="buyer-name" class="form-input" placeholder="請輸入姓名" autocomplete="name" maxlength="50">
@@ -86,7 +88,7 @@
 
         <!-- 收件人資訊 -->
         <section class="card">
-          <h3 class="card-title">收件人資訊</h3>
+          <h3 class="card-title"><span class="step-num">2</span>收件人資訊</h3>
           <label class="same-buyer-row">
             <input type="checkbox" id="same-as-buyer" class="spec-check" checked>
             同訂購人
@@ -109,7 +111,7 @@
 
         <!-- 送貨時段 -->
         <section class="card">
-          <h3 class="card-title">送貨時段</h3>
+          <h3 class="card-title"><span class="step-num">3</span>送貨時段</h3>
           <div class="radio-group">
             <label class="radio-card">
               <input type="radio" name="delivery-time" value="不指定" checked class="hidden peer">
@@ -129,7 +131,15 @@
 
         <!-- 付款方式 -->
         <section class="card">
-          <h3 class="card-title">付款方式</h3>
+          <h3 class="card-title"><span class="step-num">4</span>付款方式</h3>
+
+          <!-- 付款流程強調：先匯款 → 再回填末五碼 → 送出訂單 -->
+          <div class="payment-flow-notice">
+            <span class="flow-icon" aria-hidden="true">💡</span>
+            <p class="flow-text">
+              請先依下方資訊<strong>完成匯款</strong>，再回到此頁<strong>填寫匯款後五碼並送出訂單</strong>，我們會核對款項後安排出貨。
+            </p>
+          </div>
 
           <!-- 匯款資訊 -->
           <div id="bank-info" class="bank-box no-top-gap">
@@ -140,14 +150,14 @@
             <p class="bank-reminder">小提醒：匯款前再麻煩您核對一次訂單金額，會比較順利唷 ☺</p>
             <div class="field">
               <label for="bank-code" class="field-label">匯款後五碼 <span class="required">*</span></label>
-              <input type="tel" id="bank-code" class="form-input" placeholder="帳號末五碼" maxlength="5" inputmode="numeric" pattern="\d{5}">
+              <input type="tel" id="bank-code" class="form-input" placeholder="完成匯款後，請填入帳號末五碼" maxlength="5" inputmode="numeric" pattern="\d{5}">
             </div>
           </div>
         </section>
 
         <!-- 備註 -->
         <section class="card">
-          <h3 class="card-title">備註</h3>
+          <h3 class="card-title"><span class="step-num">5</span>備註</h3>
           <textarea id="order-note" class="form-input" rows="3" placeholder="有什麼想跟我們說的嗎？（選填）" maxlength="500"></textarea>
         </section>
 
@@ -164,7 +174,11 @@
     <!-- ==================== 訂單成功 ==================== -->
     <div id="section-success" class="hidden section">
       <div class="card success-card">
-        <div class="check" aria-hidden="true">✓</div>
+        <div class="check" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="5 12 10 17 19 8"></polyline>
+          </svg>
+        </div>
         <h2>訂單已送出</h2>
         <p class="order-id-line">訂單編號：<span id="success-order-id" class="id"></span></p>
         <p class="total-line" id="success-total"></p>
@@ -215,6 +229,50 @@
       <span id="floating-total" class="bar-total">$0</span>
     </div>
     <button id="floating-submit-btn" type="submit" form="order-form" class="btn btn-primary">送出訂單</button>
+  </div>
+
+  <!-- ==================== 確認 Modal ==================== -->
+  <div id="confirm-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title" aria-hidden="true">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="confirm-modal-title">請確認訂單資訊</h3>
+        <p>送出後將無法自行修改，請仔細核對下列內容</p>
+      </div>
+      <div class="modal-body">
+        <div class="modal-section">
+          <p class="modal-section-title">訂購品項</p>
+          <div id="confirm-items" class="modal-items"></div>
+          <div class="modal-total">
+            <span class="label">合計</span>
+            <span id="confirm-total" class="amount">$0</span>
+          </div>
+        </div>
+        <div class="modal-section">
+          <p class="modal-section-title">訂購人</p>
+          <div id="confirm-buyer" class="modal-section-body"></div>
+        </div>
+        <div class="modal-section">
+          <p class="modal-section-title">收件人</p>
+          <div id="confirm-receiver" class="modal-section-body"></div>
+        </div>
+        <div class="modal-section">
+          <p class="modal-section-title">送貨時段</p>
+          <div id="confirm-delivery" class="modal-section-body"></div>
+        </div>
+        <div class="modal-section">
+          <p class="modal-section-title">匯款後五碼</p>
+          <div id="confirm-bank-code" class="modal-section-body"></div>
+        </div>
+        <div id="confirm-note-section" class="modal-section hidden">
+          <p class="modal-section-title">備註</p>
+          <div id="confirm-note" class="modal-section-body"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="confirm-cancel-btn" type="button" class="btn btn-secondary">再檢查一下</button>
+        <button id="confirm-submit-btn" type="button" class="btn btn-primary">確認送出</button>
+      </div>
+    </div>
   </div>
 
   <script src="js/script.js"></script>

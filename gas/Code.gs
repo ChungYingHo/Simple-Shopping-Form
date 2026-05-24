@@ -123,6 +123,8 @@ function getProducts() {
     accountHolder: pick('匯款戶名', '戶名'),
     announcement: pick('公告訊息', '公告'),
     paymentNote: pick('匯款期限說明', '付款備註', '付款說明'),
+    // 選填：在 header 顯示稀缺/採收期 chip（無設定即不顯示）
+    scarcity: pick('稀缺資訊', '採收期', '限量資訊'),
   };
 
   return { success: true, data: { products, settings } };

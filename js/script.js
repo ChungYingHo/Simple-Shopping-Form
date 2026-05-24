@@ -40,10 +40,10 @@
     document.getElementById('tab-order').addEventListener('click', () => switchTab('order'));
     document.getElementById('tab-query').addEventListener('click', () => switchTab('query'));
 
-    // 訂購表單送出（含浮動 bar 的 submit 按鈕，因為有 form 屬性）
+    // 訂購表單送出 → 開啟確認 modal（不直接送出）
     document.getElementById('order-form').addEventListener('submit', e => {
       e.preventDefault();
-      submitOrder();
+      requestConfirm();
     });
 
     // 查詢表單
@@ -58,6 +58,21 @@
     // 成功頁按鈕
     document.getElementById('success-continue-btn').addEventListener('click', resetForm);
     document.getElementById('success-query-btn').addEventListener('click', () => switchTab('query'));
+
+    // 確認 modal 按鈕
+    document.getElementById('confirm-cancel-btn').addEventListener('click', closeConfirmModal);
+    document.getElementById('confirm-submit-btn').addEventListener('click', () => {
+      closeConfirmModal();
+      submitOrder();
+    });
+    // 點 overlay 背景關閉
+    document.getElementById('confirm-modal').addEventListener('click', e => {
+      if (e.target.id === 'confirm-modal') closeConfirmModal();
+    });
+    // Esc 關閉
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') closeConfirmModal();
+    });
   }
 
   // ---------- Tab 切換 ----------
@@ -256,6 +271,14 @@
       annEl.classList.remove('hidden');
     }
 
+    // 稀缺資訊（採收期/限量等）— 從「稀缺資訊」「採收期」「限量」任一鍵讀取
+    const scarcityEl = document.getElementById('scarcity-info');
+    const scarcityText = settingsData.scarcity || settingsData.harvestWindow || '';
+    if (scarcityEl && scarcityText) {
+      scarcityEl.textContent = scarcityText;
+      scarcityEl.classList.remove('hidden');
+    }
+
     // 匯款資訊
     setText('bank-name-display', settingsData.bankName || '-');
     setText('bank-branch-display', settingsData.bankBranch || '');
@@ -397,13 +420,9 @@
     } catch (_) {}
   }
 
-  // ---------- 送出訂單 ----------
+  // ---------- 收集表單資料 + 驗證 ----------
 
-  async function submitOrder() {
-    const errorEl = document.getElementById('order-error');
-    errorEl.classList.add('hidden');
-
-    // 收集資料
+  function collectOrderData() {
     const buyerName = document.getElementById('buyer-name').value.trim();
     const buyerPhone = document.getElementById('buyer-phone').value.trim();
     const buyerAddress = document.getElementById('buyer-address').value.trim();
@@ -417,46 +436,156 @@
     const bankCode = document.getElementById('bank-code').value.trim();
     const note = document.getElementById('order-note').value.trim();
 
-    const items = getSelectedItems();
+    return {
+      buyerName, buyerPhone, buyerAddress,
+      sameAsBuyer,
+      receiverName, receiverPhone, receiverAddress,
+      deliveryTime, bankCode, note,
+      items: getSelectedItems(),
+    };
+  }
 
-    // 驗證
+  function validateOrderData(data) {
     const errors = [];
-    if (!buyerName) errors.push('請填寫訂購人姓名');
-    if (!buyerPhone) errors.push('請填寫訂購人電話');
-    if (!buyerAddress) errors.push('請填寫訂購人地址');
-    if (!sameAsBuyer) {
-      if (!receiverName) errors.push('請填寫收件人姓名');
-      if (!receiverPhone) errors.push('請填寫收件人電話');
-      if (!receiverAddress) errors.push('請填寫收件地址');
+    if (!data.buyerName) errors.push('請填寫訂購人姓名');
+    if (!data.buyerPhone) errors.push('請填寫訂購人電話');
+    if (!data.buyerAddress) errors.push('請填寫訂購人地址');
+    if (!data.sameAsBuyer) {
+      if (!data.receiverName) errors.push('請填寫收件人姓名');
+      if (!data.receiverPhone) errors.push('請填寫收件人電話');
+      if (!data.receiverAddress) errors.push('請填寫收件地址');
     }
-    if (items.length === 0) errors.push('請至少選擇一項商品');
-    if (!bankCode) errors.push('請填寫匯款後五碼');
-    else if (!/^\d{5}$/.test(bankCode)) errors.push('匯款後五碼需為 5 位數字');
+    if (data.items.length === 0) errors.push('請至少選擇一項商品');
+    if (!data.bankCode) errors.push('請先完成匯款，並填寫匯款後五碼');
+    else if (!/^\d{5}$/.test(data.bankCode)) errors.push('匯款後五碼需為 5 位數字');
+    return errors;
+  }
 
+  function showOrderError(message) {
+    const errorEl = document.getElementById('order-error');
+    errorEl.textContent = message;
+    errorEl.classList.remove('hidden');
+    errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  // ---------- 確認 Modal ----------
+
+  function requestConfirm() {
+    const errorEl = document.getElementById('order-error');
+    errorEl.classList.add('hidden');
+
+    const data = collectOrderData();
+    const errors = validateOrderData(data);
     if (errors.length > 0) {
-      errorEl.textContent = errors.join('、');
-      errorEl.classList.remove('hidden');
-      errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      showOrderError(errors.join('、'));
+      return;
+    }
+    openConfirmModal(data);
+  }
+
+  function openConfirmModal(data) {
+    const specLabels = { '5': '五斤', '10': '十斤', '20': '二十斤' };
+
+    // 品項
+    const itemsEl = document.getElementById('confirm-items');
+    itemsEl.innerHTML = '';
+    let total = 0;
+    data.items.forEach(item => {
+      const row = document.createElement('div');
+      row.className = 'modal-item';
+      const name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = item.product + ' ' + (specLabels[item.spec] || item.spec) + ' ×' + item.qty + ' (箱)';
+      const amount = document.createElement('span');
+      amount.className = 'amount';
+      amount.textContent = '$' + item.amount.toLocaleString();
+      row.appendChild(name);
+      row.appendChild(amount);
+      itemsEl.appendChild(row);
+      total += item.amount;
+    });
+    setText('confirm-total', '$' + total.toLocaleString());
+
+    // 訂購人
+    fillModalLines('confirm-buyer', [data.buyerName, data.buyerPhone, data.buyerAddress]);
+
+    // 收件人
+    if (data.sameAsBuyer) {
+      fillModalLines('confirm-receiver', ['同訂購人']);
+    } else {
+      fillModalLines('confirm-receiver', [data.receiverName, data.receiverPhone, data.receiverAddress]);
+    }
+
+    // 送貨時段 / 匯款五碼
+    setText('confirm-delivery', data.deliveryTime);
+    setText('confirm-bank-code', data.bankCode);
+
+    // 備註（有才顯示）
+    const noteSection = document.getElementById('confirm-note-section');
+    if (data.note) {
+      setText('confirm-note', data.note);
+      noteSection.classList.remove('hidden');
+    } else {
+      noteSection.classList.add('hidden');
+    }
+
+    const modal = document.getElementById('confirm-modal');
+    modal.classList.add('show');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+
+    // 對焦取消鈕（避免不小心 Enter 直接確認）
+    setTimeout(() => document.getElementById('confirm-cancel-btn').focus(), 50);
+  }
+
+  function closeConfirmModal() {
+    const modal = document.getElementById('confirm-modal');
+    if (!modal.classList.contains('show')) return;
+    modal.classList.remove('show');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  }
+
+  function fillModalLines(id, lines) {
+    const el = document.getElementById(id);
+    el.innerHTML = '';
+    lines.filter(Boolean).forEach(line => {
+      const span = document.createElement('span');
+      span.className = 'line';
+      span.textContent = line;
+      el.appendChild(span);
+    });
+  }
+
+  // ---------- 送出訂單（已通過確認） ----------
+
+  async function submitOrder() {
+    const errorEl = document.getElementById('order-error');
+    errorEl.classList.add('hidden');
+
+    const data = collectOrderData();
+    const errors = validateOrderData(data);
+    if (errors.length > 0) {
+      showOrderError(errors.join('、'));
       return;
     }
 
-    // 送出
     const btn = document.getElementById('submit-btn');
     btn.classList.add('btn-loading');
     btn.disabled = true;
 
     const payload = {
       action: 'order',
-      buyerName,
-      buyerPhone,
-      buyerAddress,
-      receiverName,
-      receiverPhone,
-      receiverAddress,
-      deliveryTime,
-      bankCode,
-      note,
-      items: items.map(i => ({ product: i.product, spec: i.spec, qty: i.qty })),
+      buyerName: data.buyerName,
+      buyerPhone: data.buyerPhone,
+      buyerAddress: data.buyerAddress,
+      receiverName: data.receiverName,
+      receiverPhone: data.receiverPhone,
+      receiverAddress: data.receiverAddress,
+      deliveryTime: data.deliveryTime,
+      bankCode: data.bankCode,
+      note: data.note,
+      items: data.items.map(i => ({ product: i.product, spec: i.spec, qty: i.qty })),
     };
 
     try {
@@ -474,11 +603,9 @@
       showSuccess(json.orderId, json.total);
     } catch (err) {
       console.error('送出訂單失敗:', err);
-      errorEl.textContent = err.name === 'AbortError'
+      showOrderError(err.name === 'AbortError'
         ? '送出逾時，請稍後再試'
-        : (err.message || '送出失敗，請稍後再試');
-      errorEl.classList.remove('hidden');
-      errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        : (err.message || '送出失敗，請稍後再試'));
     } finally {
       btn.classList.remove('btn-loading');
       btn.disabled = false;
