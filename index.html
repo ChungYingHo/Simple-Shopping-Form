@@ -2,221 +2,222 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>芒果訂購</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <title>2026 何爸爸芒果</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;600;700&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body class="bg-amber-50 min-h-screen">
+<body>
 
-  <!-- Header -->
-  <header class="bg-amber-500 text-white py-4 px-4 shadow-md">
-    <h1 class="text-2xl font-bold text-center">🥭 芒果訂購</h1>
-  </header>
-
-  <!-- 公告 -->
-  <div id="announcement" class="hidden bg-amber-100 border-l-4 border-amber-500 text-amber-800 p-3 mx-4 mt-4 rounded-r text-sm max-w-2xl sm:mx-auto"></div>
-
-  <!-- Tab 切換 -->
-  <nav class="flex mx-4 mt-4 border-b border-amber-300 max-w-2xl sm:mx-auto">
-    <button id="tab-order" class="tab-btn active flex-1 py-3 text-center font-semibold text-amber-800 border-b-2 border-amber-500 bg-white rounded-t-lg" onclick="switchTab('order')">
-      訂購
-    </button>
-    <button id="tab-query" class="tab-btn flex-1 py-3 text-center font-semibold text-gray-500 bg-amber-100 rounded-t-lg" onclick="switchTab('query')">
-      查詢訂單
-    </button>
-  </nav>
-
-  <!-- ==================== 訂購區 ==================== -->
-  <main id="section-order" class="px-4 py-6 max-w-2xl mx-auto">
-
-    <!-- 商品載入中 -->
-    <div id="products-loading" class="space-y-4">
-      <div class="bg-white rounded-xl p-4 shadow animate-pulse">
-        <div class="h-5 bg-gray-200 rounded w-1/3 mb-3"></div>
-        <div class="h-4 bg-gray-200 rounded w-2/3 mb-2"></div>
-        <div class="h-4 bg-gray-200 rounded w-1/2"></div>
-      </div>
-      <div class="bg-white rounded-xl p-4 shadow animate-pulse">
-        <div class="h-5 bg-gray-200 rounded w-1/3 mb-3"></div>
-        <div class="h-4 bg-gray-200 rounded w-2/3 mb-2"></div>
-        <div class="h-4 bg-gray-200 rounded w-1/2"></div>
-      </div>
-    </div>
-
-    <!-- 商品列表 -->
-    <div id="products-container" class="space-y-4 hidden"></div>
-
-    <!-- 載入失敗 -->
-    <div id="products-error" class="hidden bg-red-50 text-red-700 p-4 rounded-xl text-center">
-      <p>商品載入失敗，請重新整理頁面</p>
-      <button onclick="location.reload()" class="mt-2 text-sm underline">重新整理</button>
-    </div>
-
-    <!-- 訂單摘要 -->
-    <div id="order-summary" class="hidden bg-white rounded-xl shadow p-4 mt-6 sticky bottom-4">
-      <h3 class="font-bold text-amber-800 mb-2">訂單摘要</h3>
-      <div id="summary-items" class="text-sm space-y-1"></div>
-      <div class="border-t border-gray-200 mt-2 pt-2 flex justify-between font-bold text-lg text-amber-800">
-        <span>合計</span>
-        <span id="summary-total">$0</span>
-      </div>
-    </div>
-
-    <!-- 訂購人資訊 -->
-    <section class="bg-white rounded-xl shadow p-4 mt-6">
-      <h3 class="font-bold text-amber-800 mb-3">訂購人資訊</h3>
-      <div class="space-y-3">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">姓名 <span class="text-red-500">*</span></label>
-          <input type="text" id="buyer-name" class="form-input" placeholder="請輸入姓名">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">電話 <span class="text-red-500">*</span></label>
-          <input type="tel" id="buyer-phone" class="form-input" placeholder="例：0912345678">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">地址 <span class="text-red-500">*</span></label>
-          <input type="text" id="buyer-address" class="form-input" placeholder="請輸入地址">
-        </div>
-      </div>
-    </section>
-
-    <!-- 收件人資訊 -->
-    <section class="bg-white rounded-xl shadow p-4 mt-4">
-      <h3 class="font-bold text-amber-800 mb-3">收件人資訊</h3>
-      <label class="flex items-center gap-2 mb-3 cursor-pointer">
-        <input type="checkbox" id="same-as-buyer" checked class="w-5 h-5 rounded text-amber-500 focus:ring-amber-500">
-        <span class="text-sm text-gray-700">同訂購人</span>
-      </label>
-      <div id="receiver-fields" class="space-y-3 hidden">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">收件人姓名 <span class="text-red-500">*</span></label>
-          <input type="text" id="receiver-name" class="form-input" placeholder="請輸入收件人姓名">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">收件人電話 <span class="text-red-500">*</span></label>
-          <input type="tel" id="receiver-phone" class="form-input" placeholder="例：0912345678">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">收件地址 <span class="text-red-500">*</span></label>
-          <input type="text" id="receiver-address" class="form-input" placeholder="請輸入收件地址">
-        </div>
-      </div>
-    </section>
-
-    <!-- 送貨時段 -->
-    <section class="bg-white rounded-xl shadow p-4 mt-4">
-      <h3 class="font-bold text-amber-800 mb-3">送貨時段</h3>
-      <div class="flex gap-3">
-        <label class="radio-card">
-          <input type="radio" name="delivery-time" value="不指定" checked class="hidden peer">
-          <span class="radio-label peer-checked:bg-amber-500 peer-checked:text-white">不指定</span>
-        </label>
-        <label class="radio-card">
-          <input type="radio" name="delivery-time" value="上午" class="hidden peer">
-          <span class="radio-label peer-checked:bg-amber-500 peer-checked:text-white">上午</span>
-        </label>
-        <label class="radio-card">
-          <input type="radio" name="delivery-time" value="下午" class="hidden peer">
-          <span class="radio-label peer-checked:bg-amber-500 peer-checked:text-white">下午</span>
-        </label>
-      </div>
-      <p class="text-xs text-gray-400 mt-2">備註盡可能跟物流說，但一切按物流安排</p>
-    </section>
-
-    <!-- 付款方式 -->
-    <section class="bg-white rounded-xl shadow p-4 mt-4">
-      <h3 class="font-bold text-amber-800 mb-3">付款方式 <span class="text-red-500">*</span></h3>
-      <div class="flex gap-3">
-        <label class="radio-card flex-1">
-          <input type="radio" name="payment-method" value="匯款" checked class="hidden peer">
-          <span class="radio-label w-full text-center peer-checked:bg-amber-500 peer-checked:text-white">匯款</span>
-        </label>
-        <label class="radio-card flex-1">
-          <input type="radio" name="payment-method" value="現金付款" class="hidden peer">
-          <span class="radio-label w-full text-center peer-checked:bg-amber-500 peer-checked:text-white">現金付款</span>
-        </label>
-      </div>
-
-      <!-- 匯款資訊（付款方式=匯款 時顯示） -->
-      <div id="bank-info" class="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3">
-        <h4 class="font-semibold text-amber-800 text-sm mb-2">匯款帳號</h4>
-        <div id="bank-details" class="text-sm text-gray-700 space-y-1">
-          <p>銀行：<span id="bank-name-display">-</span> <span id="bank-branch-display"></span></p>
-          <p>帳號：<span id="bank-account-display">-</span></p>
-          <p>戶名：<span id="bank-holder-display">-</span></p>
-        </div>
-        <p id="payment-note-display" class="text-xs text-amber-600 mt-2"></p>
-        <div class="mt-3">
-          <label class="block text-sm font-medium text-gray-700 mb-1">匯款後五碼 <span class="text-red-500">*</span></label>
-          <input type="text" id="bank-code" class="form-input" placeholder="帳號末五碼" maxlength="5" inputmode="numeric">
-        </div>
-      </div>
-    </section>
-
-    <!-- 備註 -->
-    <section class="bg-white rounded-xl shadow p-4 mt-4">
-      <h3 class="font-bold text-amber-800 mb-3">備註</h3>
-      <textarea id="order-note" class="form-input h-20 resize-none" placeholder="有什麼需要備註的嗎？（選填）"></textarea>
-    </section>
-
-    <!-- 錯誤訊息 -->
-    <div id="order-error" class="hidden bg-red-50 text-red-700 p-3 rounded-lg mt-4 text-sm"></div>
-
-    <!-- 送出按鈕 -->
-    <button id="submit-btn" onclick="submitOrder()" class="w-full mt-6 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white font-bold py-4 rounded-xl text-lg shadow-lg transition-colors min-h-[48px]">
-      送出訂單
-    </button>
-  </main>
-
-  <!-- ==================== 訂單成功 ==================== -->
-  <div id="section-success" class="hidden px-4 py-6 max-w-2xl mx-auto">
-    <div class="bg-white rounded-xl shadow p-6 text-center">
-      <div class="text-5xl mb-3">✅</div>
-      <h2 class="text-xl font-bold text-amber-800 mb-2">訂單已送出！</h2>
-      <p class="text-gray-600 mb-1">訂單編號：<span id="success-order-id" class="font-mono font-bold"></span></p>
-      <p class="text-gray-600 mb-4">訂單總額：<span id="success-total" class="font-bold text-amber-700"></span></p>
-      <div id="success-bank-info" class="bg-amber-50 rounded-lg p-4 text-left text-sm mb-4">
-        <p class="font-semibold text-amber-800 mb-2">請匯款至以下帳戶：</p>
-        <div id="success-bank-details"></div>
-      </div>
-      <div class="flex gap-3">
-        <button onclick="resetForm()" class="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-xl transition-colors min-h-[48px]">繼續訂購</button>
-        <button onclick="switchTab('query')" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3 rounded-xl transition-colors min-h-[48px]">查詢訂單</button>
-      </div>
+  <!-- 全頁載入蓋版 -->
+  <div id="page-loader" class="page-loader" aria-live="polite" aria-busy="true">
+    <div class="loader-content">
+      <div class="loader-spinner" aria-hidden="true"></div>
+      <p class="loader-text">準備芒果中…</p>
     </div>
   </div>
 
-  <!-- ==================== 查詢區 ==================== -->
-  <section id="section-query" class="hidden px-4 py-6 max-w-2xl mx-auto">
-    <div class="bg-white rounded-xl shadow p-4">
-      <h3 class="font-bold text-amber-800 mb-3">輸入電話號碼查詢訂單</h3>
-      <div class="flex gap-2">
-        <input type="tel" id="query-phone" class="form-input flex-1" placeholder="例：0912345678">
-        <button id="query-btn" onclick="queryOrders()" class="bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white font-bold px-6 rounded-xl transition-colors min-h-[48px] whitespace-nowrap">
-          查詢
+  <!-- Header -->
+  <header class="app-header">
+    <span class="brand-mark">SEASONAL · MANGO</span>
+    <h1>2026 何爸爸芒果</h1>
+    <p class="tagline">夏日限定 · 直送到府</p>
+  </header>
+
+  <div class="container">
+
+    <!-- 公告 -->
+    <div id="announcement" class="hidden announcement mb-14"></div>
+
+    <!-- Tabs（置中） -->
+    <nav class="tabs-wrap">
+      <div class="tabs" role="tablist">
+        <button id="tab-order" class="tab-btn active" type="button" role="tab" aria-selected="true" aria-controls="section-order" onclick="switchTab('order')">訂購</button>
+        <button id="tab-query" class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="section-query" onclick="switchTab('query')">查詢訂單</button>
+      </div>
+    </nav>
+
+    <!-- ==================== 訂購區 ==================== -->
+    <main id="section-order" role="tabpanel" aria-labelledby="tab-order">
+      <form id="order-form" class="section" onsubmit="event.preventDefault(); submitOrder();" novalidate>
+
+        <!-- 商品列表 -->
+        <div id="products-container" class="section-stack"></div>
+
+        <!-- 載入失敗 -->
+        <div id="products-error" class="hidden alert alert-error mt-14">
+          <div class="error-actions">
+            <p>商品載入失敗，請重新整理頁面</p>
+            <button type="button" onclick="location.reload()" class="btn btn-ghost">重新整理</button>
+          </div>
+        </div>
+
+        <!-- 訂單摘要（桌機顯示；行動裝置由浮動 bar 取代） -->
+        <div id="order-summary" class="hidden mt-20">
+          <div class="summary-card">
+            <p class="summary-title">訂單摘要</p>
+            <div id="summary-items" class="summary-items"></div>
+            <div class="summary-total">
+              <span class="label">合計</span>
+              <span id="summary-total" class="amount">$0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 訂購人資訊 -->
+        <section class="card mt-20">
+          <h3 class="card-title">訂購人資訊</h3>
+          <div class="field">
+            <label for="buyer-name" class="field-label">姓名 <span class="required">*</span></label>
+            <input type="text" id="buyer-name" class="form-input" placeholder="請輸入姓名" autocomplete="name">
+          </div>
+          <div class="field">
+            <label for="buyer-phone" class="field-label">電話 <span class="required">*</span></label>
+            <input type="tel" id="buyer-phone" class="form-input" placeholder="例：0912345678" autocomplete="tel">
+          </div>
+          <div class="field">
+            <label for="buyer-address" class="field-label">地址 <span class="required">*</span></label>
+            <input type="text" id="buyer-address" class="form-input" placeholder="請輸入地址" autocomplete="street-address">
+          </div>
+        </section>
+
+        <!-- 收件人資訊 -->
+        <section class="card">
+          <h3 class="card-title">收件人資訊</h3>
+          <label class="same-buyer-row">
+            <input type="checkbox" id="same-as-buyer" class="spec-check" checked>
+            同訂購人
+          </label>
+          <div id="receiver-fields" class="hidden">
+            <div class="field">
+              <label for="receiver-name" class="field-label">收件人姓名 <span class="required">*</span></label>
+              <input type="text" id="receiver-name" class="form-input" placeholder="請輸入收件人姓名">
+            </div>
+            <div class="field">
+              <label for="receiver-phone" class="field-label">收件人電話 <span class="required">*</span></label>
+              <input type="tel" id="receiver-phone" class="form-input" placeholder="例：0912345678">
+            </div>
+            <div class="field">
+              <label for="receiver-address" class="field-label">收件地址 <span class="required">*</span></label>
+              <input type="text" id="receiver-address" class="form-input" placeholder="請輸入收件地址">
+            </div>
+          </div>
+        </section>
+
+        <!-- 送貨時段 -->
+        <section class="card">
+          <h3 class="card-title">送貨時段</h3>
+          <div class="radio-group">
+            <label class="radio-card">
+              <input type="radio" name="delivery-time" value="不指定" checked class="hidden peer">
+              <span class="radio-label">不指定</span>
+            </label>
+            <label class="radio-card">
+              <input type="radio" name="delivery-time" value="上午" class="hidden peer">
+              <span class="radio-label">上午</span>
+            </label>
+            <label class="radio-card">
+              <input type="radio" name="delivery-time" value="下午" class="hidden peer">
+              <span class="radio-label">下午</span>
+            </label>
+          </div>
+          <p class="delivery-hint">我們會盡可能與物流溝通您的時段需求，實際送達時間仍依物流安排為準，敬請見諒</p>
+        </section>
+
+        <!-- 付款方式 -->
+        <section class="card">
+          <h3 class="card-title">付款方式</h3>
+
+          <!-- 匯款資訊 -->
+          <div id="bank-info" class="bank-box no-top-gap">
+            <h4>匯款帳號</h4>
+            <p>銀行：<span id="bank-name-display">-</span> <span id="bank-branch-display"></span></p>
+            <p>帳號：<span id="bank-account-display">-</span></p>
+            <!-- 戶名不顯示：ATM/網銀轉帳實際上不需要輸入戶名，避免畫面冗長。Sheet 的「匯款戶名」欄保留以供內部核對。 -->
+            <p id="bank-holder-row" class="hidden">戶名：<span id="bank-holder-display">-</span></p>
+            <p id="payment-note-display" class="bank-note hidden"></p>
+            <p class="bank-reminder">小提醒：匯款前再麻煩您核對一次訂單金額，會比較順利唷 ☺</p>
+            <div class="field">
+              <label for="bank-code" class="field-label">匯款後五碼 <span class="required">*</span></label>
+              <input type="tel" id="bank-code" class="form-input" placeholder="帳號末五碼" maxlength="5" inputmode="numeric" pattern="\d{5}">
+            </div>
+          </div>
+        </section>
+
+        <!-- 備註 -->
+        <section class="card">
+          <h3 class="card-title">備註</h3>
+          <textarea id="order-note" class="form-input" rows="3" placeholder="有什麼想跟我們說的嗎？（選填）"></textarea>
+        </section>
+
+        <!-- 錯誤訊息 -->
+        <div id="order-error" class="hidden alert alert-error mt-14"></div>
+
+        <!-- 送出按鈕（桌機 / Enter 鍵 / fallback） -->
+        <button id="submit-btn" type="submit" class="btn btn-primary btn-block btn-lg mt-24">
+          送出訂單
         </button>
+      </form>
+    </main>
+
+    <!-- ==================== 訂單成功 ==================== -->
+    <div id="section-success" class="hidden section">
+      <div class="card success-card">
+        <div class="check" aria-hidden="true">✓</div>
+        <h2>訂單已送出</h2>
+        <p class="order-id-line">訂單編號：<span id="success-order-id" class="id"></span></p>
+        <p class="total-line" id="success-total"></p>
+        <div class="btn-row">
+          <button type="button" onclick="resetForm()" class="btn btn-primary">繼續訂購</button>
+          <button type="button" onclick="switchTab('query')" class="btn btn-secondary">查詢訂單</button>
+        </div>
       </div>
     </div>
 
-    <!-- 查詢結果 -->
-    <div id="query-loading" class="hidden mt-4">
-      <div class="bg-white rounded-xl p-4 shadow animate-pulse">
-        <div class="h-5 bg-gray-200 rounded w-1/2 mb-3"></div>
-        <div class="h-4 bg-gray-200 rounded w-full mb-2"></div>
-        <div class="h-4 bg-gray-200 rounded w-3/4"></div>
+    <!-- ==================== 查詢區 ==================== -->
+    <section id="section-query" class="hidden section" role="tabpanel" aria-labelledby="tab-query">
+      <div class="card">
+        <h3 class="card-title">輸入電話號碼查詢訂單</h3>
+        <form class="query-row" onsubmit="event.preventDefault(); queryOrders();">
+          <input type="tel" id="query-phone" class="form-input" placeholder="例：0912345678" autocomplete="tel">
+          <button id="query-btn" type="submit" class="btn btn-primary">查詢</button>
+        </form>
       </div>
-    </div>
 
-    <div id="query-error" class="hidden bg-red-50 text-red-700 p-4 rounded-xl mt-4 text-center text-sm"></div>
-    <div id="query-empty" class="hidden bg-gray-50 text-gray-500 p-4 rounded-xl mt-4 text-center text-sm">查無訂單紀錄</div>
-    <div id="query-results" class="space-y-4 mt-4"></div>
-  </section>
+      <div id="query-loading" class="hidden mt-14">
+        <div class="card inline-loading">
+          <div class="inline-spinner" aria-hidden="true"></div>
+          <span>查詢中…</span>
+        </div>
+      </div>
 
-  <footer class="text-center text-xs text-gray-400 py-6 px-4">
-    如有問題請直接聯繫我們
+      <div id="query-error" class="hidden alert alert-error mt-14"></div>
+      <div id="query-empty" class="hidden alert alert-empty mt-14">查無訂單紀錄</div>
+      <div id="query-results" class="section-stack mt-14"></div>
+    </section>
+
+  </div>
+
+  <footer class="app-footer">
+    <p class="footer-line">
+      如有問題請
+      <a href="https://www.facebook.com/plantae.tw/" target="_blank" rel="noopener" class="contact-link">直接聯繫我們</a>
+      <span class="footer-sep">｜</span>
+      <a href="tel:+886932828386" class="contact-link">0932828386</a>（何爸爸）
+    </p>
   </footer>
+
+  <!-- 浮動底部 CTA（行動裝置） -->
+  <div id="floating-bar" class="floating-bar" aria-hidden="true">
+    <div class="bar-summary">
+      <span class="bar-label">合計</span>
+      <span id="floating-total" class="bar-total">$0</span>
+    </div>
+    <button type="button" onclick="submitOrder()" class="btn btn-primary">送出訂單</button>
+  </div>
 
   <script src="js/script.js"></script>
 </body>

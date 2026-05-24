@@ -66,8 +66,13 @@ function getProducts() {
   // 商品
   const prodSheet = ss.getSheetByName(SHEET_PRODUCTS);
   const prodData = prodSheet.getDataRange().getValues();
-  const prodHeader = prodData[0]; // 第一列為標題
   const products = [];
+
+  const parsePrice = v => {
+    if (v === '' || v === null || v === undefined) return null;
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  };
 
   for (let i = 1; i < prodData.length; i++) {
     const row = prodData[i];
@@ -76,9 +81,9 @@ function getProducts() {
 
     const soldOut = String(row[4]).trim() === '是';
     const prices = {};
-    if (row[1] !== '' && row[1] !== null && row[1] !== undefined) prices['5'] = Number(row[1]);
-    if (row[2] !== '' && row[2] !== null && row[2] !== undefined) prices['10'] = Number(row[2]);
-    if (row[3] !== '' && row[3] !== null && row[3] !== undefined) prices['20'] = Number(row[3]);
+    const p5 = parsePrice(row[1]); if (p5 !== null) prices['5'] = p5;
+    const p10 = parsePrice(row[2]); if (p10 !== null) prices['10'] = p10;
+    const p20 = parsePrice(row[3]); if (p20 !== null) prices['20'] = p20;
 
     products.push({ name, prices, soldOut });
   }
@@ -93,13 +98,20 @@ function getProducts() {
     if (key) settingsMap[key] = val;
   }
 
+  const pick = (...keys) => {
+    for (const k of keys) {
+      if (settingsMap[k]) return settingsMap[k];
+    }
+    return '';
+  };
+
   const settings = {
-    bankName: settingsMap['匯款銀行'] || '',
-    bankBranch: settingsMap['分行'] || '',
-    accountNumber: settingsMap['帳號'] || '',
-    accountHolder: settingsMap['戶名'] || '',
-    announcement: settingsMap['公告訊息'] || '',
-    paymentNote: settingsMap['匯款期限說明'] || '',
+    bankName: pick('匯款銀行', '銀行'),
+    bankBranch: pick('分行', '匯款分行'),
+    accountNumber: pick('匯款帳號', '帳號'),
+    accountHolder: pick('匯款戶名', '戶名'),
+    announcement: pick('公告訊息', '公告'),
+    paymentNote: pick('匯款期限說明', '付款備註', '付款說明'),
   };
 
   return { success: true, data: { products, settings } };
@@ -122,6 +134,7 @@ function queryOrders(phone) {
   // 0:訂單編號 1:訂購時間 2:訂購人姓名 3:訂購人電話 4:訂購人地址
   // 5:收件人姓名 6:收件人電話 7:收件地址 8:送貨時段 9:付款方式
   // 10:匯款後五碼 11:備註 12:商品 13:規格 14:數量 15:金額 16:訂單狀態
+  // 17:運送編號
 
   const ordersMap = {};
 
@@ -135,7 +148,11 @@ function queryOrders(phone) {
         orderId: orderId,
         time: formatDate(row[1]),
         buyerName: String(row[2]).trim(),
-        status: String(row[16]).trim(),
+        buyerPhone: String(row[3]).trim(),
+        buyerAddress: String(row[4]).trim(),
+        receiverName: String(row[5]).trim(),
+        receiverPhone: String(row[6]).trim(),
+        receiverAddress: String(row[7]).trim(),
         paymentMethod: String(row[9]).trim(),
         deliveryTime: String(row[8]).trim(),
         items: [],
@@ -149,6 +166,8 @@ function queryOrders(phone) {
       spec: String(row[13]).trim(),
       qty: Number(row[14]) || 0,
       amount: amount,
+      status: String(row[16]).trim(),
+      shippingNumber: String(row[17] == null ? '' : row[17]).trim(),
     });
     ordersMap[orderId].total += amount;
   }
@@ -243,52 +262,74 @@ function createOrder(body) {
     });
   }
 
-  // 產生訂單編號
-  const orderId = generateOrderId(ss);
+  // ----- 上鎖避免並發訂單號碰撞 / 列交錯 -----
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000); // 最多等 10 秒
+  } catch (_) {
+    return { success: false, error: '系統忙碌中，請稍後再試' };
+  }
 
-  // 寫入
-  const orderSheet = ss.getSheetByName(SHEET_ORDERS);
-  const now = new Date();
-  const timeStr = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm');
+  let orderId;
+  try {
+    orderId = generateOrderId(ss);
 
-  const buyerName = String(body.buyerName).trim();
-  const buyerPhone = String(body.buyerPhone).trim();
-  const buyerAddress = String(body.buyerAddress).trim();
-  const receiverName = String(body.receiverName).trim();
-  const receiverPhone = String(body.receiverPhone).trim();
-  const receiverAddress = String(body.receiverAddress).trim();
-  const deliveryTime = String(body.deliveryTime || '不指定').trim();
-  const bankCode = paymentMethod === '匯款' ? String(body.bankCode || '').trim() : '';
-  const note = String(body.note || '').trim();
+    const orderSheet = ss.getSheetByName(SHEET_ORDERS);
+    const now = new Date();
+    const timeStr = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm');
 
-  for (const item of validatedItems) {
-    orderSheet.appendRow([
-      orderId,
-      timeStr,
-      buyerName,
-      buyerPhone,
-      buyerAddress,
-      receiverName,
-      receiverPhone,
-      receiverAddress,
-      deliveryTime,
-      paymentMethod,
-      bankCode,
-      note,
-      item.product,
-      item.spec,
-      item.qty,
-      item.amount,
-      '訂單確認中',
-    ]);
+    const buyerName = String(body.buyerName).trim();
+    const buyerPhone = String(body.buyerPhone).trim();
+    const buyerAddress = String(body.buyerAddress).trim();
+    const receiverName = String(body.receiverName).trim();
+    const receiverPhone = String(body.receiverPhone).trim();
+    const receiverAddress = String(body.receiverAddress).trim();
+    const deliveryTime = String(body.deliveryTime || '不指定').trim();
+    const bankCode = paymentMethod === '匯款' ? String(body.bankCode || '').trim() : '';
+    const note = String(body.note || '').trim();
 
-    // 強制電話/匯款末五碼為純文字，避免開頭 0 被 Sheets 吃掉
-    const lastRow = orderSheet.getLastRow();
-    orderSheet.getRange(lastRow, 4).setNumberFormat('@').setValue(buyerPhone);    // D 欄：訂購人電話
-    orderSheet.getRange(lastRow, 7).setNumberFormat('@').setValue(receiverPhone); // G 欄：收件人電話
-    if (bankCode) {
-      orderSheet.getRange(lastRow, 11).setNumberFormat('@').setValue(bankCode);   // K 欄：匯款後五碼
+    const firstNewRow = orderSheet.getLastRow() + 1;
+
+    for (const item of validatedItems) {
+      orderSheet.appendRow([
+        orderId,
+        timeStr,
+        buyerName,
+        buyerPhone,
+        buyerAddress,
+        receiverName,
+        receiverPhone,
+        receiverAddress,
+        deliveryTime,
+        paymentMethod,
+        bankCode,
+        note,
+        item.product,
+        item.spec,
+        item.qty,
+        item.amount,
+        '訂單確認中',
+      ]);
+
+      // 強制電話/匯款末五碼為純文字，避免開頭 0 被 Sheets 吃掉
+      const lastRow = orderSheet.getLastRow();
+      orderSheet.getRange(lastRow, 4).setNumberFormat('@').setValue(buyerPhone);    // D 欄：訂購人電話
+      orderSheet.getRange(lastRow, 7).setNumberFormat('@').setValue(receiverPhone); // G 欄：收件人電話
+      if (bankCode) {
+        orderSheet.getRange(lastRow, 11).setNumberFormat('@').setValue(bankCode);   // K 欄：匯款後五碼
+      }
     }
+
+    // 交替底色，方便視覺區分不同訂單（同 orderId 永遠同色）
+    // 用訂單編號尾碼奇偶決定：粉黃 / 粉綠
+    // 只塗 A~P 欄（cols 1-16），避開 Q 欄（訂單狀態下拉色標）；R 欄（運送編號）也一起塗
+    const seqMatch = orderId.match(/-(\d+)$/);
+    const seq = seqMatch ? parseInt(seqMatch[1], 10) : 0;
+    const bgColor = seq % 2 === 1 ? '#FFF8DC' : '#E8F5E9'; // 粉黃 / 粉綠
+    orderSheet.getRange(firstNewRow, 1, validatedItems.length, 16).setBackground(bgColor);
+    orderSheet.getRange(firstNewRow, 18, validatedItems.length, 1).setBackground(bgColor);
+  } finally {
+    lock.releaseLock();
   }
 
   return { success: true, orderId: orderId, total: totalAmount };
