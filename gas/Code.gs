@@ -16,6 +16,10 @@ const MAX_NOTE_LEN = 500;
 const MAX_BANK_CODE_LEN = 10;
 const MAX_ITEMS = 20;
 
+// 兩箱折扣：同商品＋同規格，每滿 2 箱折 100（累加）。
+// 折扣金額一律以後端為準，前端僅供顯示。
+const PAIR_DISCOUNT = 100;
+
 // Rate limit
 const RATE_ORDER_WINDOW_SEC = 60;   // 同電話 60 秒內最多 1 單
 const RATE_QUERY_WINDOW_SEC = 60;   // 同電話 60 秒內最多 10 次查詢
@@ -276,7 +280,9 @@ function createOrder(body) {
     }
 
     const unitPrice = priceMap[product][spec];
-    const amount = unitPrice * qty;
+    // 同商品同規格每滿 2 箱折 PAIR_DISCOUNT（累加），折扣後寫入該列金額。
+    const discount = Math.floor(qty / 2) * PAIR_DISCOUNT;
+    const amount = unitPrice * qty - discount;
     totalAmount += amount;
 
     validatedItems.push({

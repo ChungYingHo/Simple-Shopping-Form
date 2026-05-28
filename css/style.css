@@ -563,6 +563,12 @@ textarea.form-input {
   color: var(--text);
 }
 
+.summary-line.is-discount,
+.summary-line.is-discount .summary-line-amount {
+  color: var(--success);
+  font-weight: 600;
+}
+
 .summary-total {
   margin-top: 10px;
   padding-top: 10px;
@@ -1153,6 +1159,39 @@ textarea.form-input {
   font-weight: 600;
 }
 
+/* ---------- 兩箱折扣說明 ---------- */
+.promo-note {
+  background: var(--mango-50);
+  border: 1px solid var(--mango-light);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.promo-note .promo-icon {
+  font-size: 18px;
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+.promo-note .promo-text {
+  font-size: 13.5px;
+  color: var(--text);
+  line-height: 1.6;
+  margin: 0;
+}
+.promo-note .promo-text strong {
+  color: var(--mango-dark);
+  font-weight: 600;
+}
+
+.note-hint {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin: 0 0 10px;
+}
+
 /* ---------- Confirmation Modal ---------- */
 .modal-overlay {
   position: fixed;
@@ -1237,6 +1276,8 @@ textarea.form-input {
 }
 .modal-item .name { color: var(--text); }
 .modal-item .amount { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.modal-item.is-discount .name,
+.modal-item.is-discount .amount { color: var(--success); }
 
 .modal-total {
   margin-top: 12px;

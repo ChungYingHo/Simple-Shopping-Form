@@ -31,10 +31,33 @@ test.describe('下單流程', () => {
     await page.evaluate(() => localStorage.clear());
     await expect(page.locator('#page-loader')).toBeHidden();
 
-    await selectMango(page, '10', 2); // 850 × 2 = 1700
+    await selectMango(page, '10', 2); // 850 × 2 = 1700，兩箱折 100 → 1600
 
-    await expect(page.locator('#floating-total')).toHaveText('$1,700');
+    await expect(page.locator('#floating-total')).toHaveText('$1,600');
     await expect(page.locator('#floating-bar')).toHaveClass(/show/);
+  });
+
+  test('同商品同規格滿 2 箱顯示兩箱折扣，總額扣除 100', async ({ page }) => {
+    await mockGasApi(page);
+    await page.goto('/');
+    await page.evaluate(() => localStorage.clear());
+    await expect(page.locator('#page-loader')).toBeHidden();
+
+    // 1 箱不折
+    await selectMango(page, '10', 1); // 850
+    await expect(page.locator('#summary-items .is-discount')).toHaveCount(0);
+    await expect(page.locator('#summary-total')).toHaveText('$850');
+
+    // 3 箱：850×3 = 2550，floor(3/2)×100 = 100 折 → 2450
+    const qtyInput = page.locator('.product-card').filter({ hasText: '愛文芒果' }).locator('#qtyval-spec-0-10');
+    await qtyInput.fill('3');
+    await qtyInput.blur();
+
+    const discountLine = page.locator('#summary-items .is-discount');
+    await expect(discountLine).toHaveCount(1);
+    await expect(discountLine).toContainText('兩箱折扣');
+    await expect(discountLine).toContainText('−$100');
+    await expect(page.locator('#summary-total')).toHaveText('$2,450');
   });
 
   test('未填欄位時送出 → 顯示驗證錯誤、不開 modal', async ({ page }) => {

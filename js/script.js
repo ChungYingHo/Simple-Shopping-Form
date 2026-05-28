@@ -11,6 +11,9 @@
   // fetch timeout（GAS 偶爾會 hang）
   const FETCH_TIMEOUT_MS = 20000;
 
+  // 兩箱折扣：同商品＋同規格，每滿 2 箱折 100（累加）。僅供前端顯示，金額以後端為準。
+  const PAIR_DISCOUNT = 100;
+
   // 全域狀態
   let productsData = [];
   let settingsData = {};
@@ -350,7 +353,8 @@
         spec: cb.dataset.spec,
         qty: qty,
         price: price,
-        amount: price * qty,
+        amount: price * qty,                      // 折扣前小計
+        discount: Math.floor(qty / 2) * PAIR_DISCOUNT,
       });
     });
     return items;
@@ -373,7 +377,8 @@
     itemsEl.innerHTML = '';
 
     const specLabels = { '5': '五斤', '10': '十斤', '20': '二十斤' };
-    let total = 0;
+    let subtotal = 0;
+    let discountTotal = 0;
 
     items.forEach(item => {
       const row = document.createElement('div');
@@ -386,9 +391,24 @@
       row.appendChild(labelSpan);
       row.appendChild(amountSpan);
       itemsEl.appendChild(row);
-      total += item.amount;
+      subtotal += item.amount;
+      discountTotal += item.discount;
     });
 
+    if (discountTotal > 0) {
+      const row = document.createElement('div');
+      row.className = 'summary-line is-discount';
+      const labelSpan = document.createElement('span');
+      labelSpan.textContent = '兩箱折扣';
+      const amountSpan = document.createElement('span');
+      amountSpan.className = 'summary-line-amount';
+      amountSpan.textContent = '−$' + discountTotal.toLocaleString();
+      row.appendChild(labelSpan);
+      row.appendChild(amountSpan);
+      itemsEl.appendChild(row);
+    }
+
+    const total = subtotal - discountTotal;
     const totalStr = '$' + total.toLocaleString();
     totalEl.textContent = totalStr;
     if (floatingTotal) floatingTotal.textContent = totalStr;
@@ -503,7 +523,8 @@
     // 品項
     const itemsEl = document.getElementById('confirm-items');
     itemsEl.innerHTML = '';
-    let total = 0;
+    let subtotal = 0;
+    let discountTotal = 0;
     data.items.forEach(item => {
       const row = document.createElement('div');
       row.className = 'modal-item';
@@ -516,9 +537,25 @@
       row.appendChild(name);
       row.appendChild(amount);
       itemsEl.appendChild(row);
-      total += item.amount;
+      subtotal += item.amount;
+      discountTotal += item.discount;
     });
-    setText('confirm-total', '$' + total.toLocaleString());
+
+    if (discountTotal > 0) {
+      const row = document.createElement('div');
+      row.className = 'modal-item is-discount';
+      const name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = '兩箱折扣';
+      const amount = document.createElement('span');
+      amount.className = 'amount';
+      amount.textContent = '−$' + discountTotal.toLocaleString();
+      row.appendChild(name);
+      row.appendChild(amount);
+      itemsEl.appendChild(row);
+    }
+
+    setText('confirm-total', '$' + (subtotal - discountTotal).toLocaleString());
 
     // 訂購人
     fillModalLines('confirm-buyer', [data.buyerName, data.buyerPhone, data.buyerAddress]);
