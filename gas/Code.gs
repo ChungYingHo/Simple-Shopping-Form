@@ -293,16 +293,25 @@ function createOrder(body) {
   }
 
   // 同規格（不限品項）每滿 2 箱折 PAIR_DISCOUNT（累加）。
-  // 折扣以規格為單位計算，再分攤到該規格的各列（依序扣抵），讓每列金額加總＝折後總額。
+  // 折扣分攤到各列，讓每列金額加總＝折後總額，且每列金額直覺易懂：
+  //  (1) 每筆品項先折自己成對的箱數：floor(qty/2)*PAIR_DISCOUNT
+  //  (2) 同規格剩下的單箱（奇數）跨品項兩兩湊對，每湊成一對再折 PAIR_DISCOUNT
+  //      （湊對折扣記在該對中單價較高的一筆，避免折到負值）
+  // 兩步合計 = floor(該規格總箱數 / 2) * PAIR_DISCOUNT（數學恆等）。
+  validatedItems.forEach(function (it) {
+    it.amount = it.gross - Math.floor(it.qty / 2) * PAIR_DISCOUNT;
+  });
+
   for (const specKey in qtyBySpec) {
-    let remaining = Math.floor(qtyBySpec[specKey] / 2) * PAIR_DISCOUNT;
-    if (remaining <= 0) continue;
-    for (const it of validatedItems) {
-      if (it.specKey !== specKey) continue;
-      const take = Math.min(remaining, it.gross);
-      it.amount = it.gross - take;
-      remaining -= take;
-      if (remaining <= 0) break;
+    const leftovers = validatedItems.filter(function (it) {
+      return it.specKey === specKey && it.qty % 2 === 1;
+    });
+    const pairs = Math.floor(leftovers.length / 2);
+    for (let p = 0; p < pairs; p++) {
+      const a = leftovers[2 * p];
+      const b = leftovers[2 * p + 1];
+      const target = a.gross >= b.gross ? a : b;
+      target.amount -= PAIR_DISCOUNT;
     }
   }
 
