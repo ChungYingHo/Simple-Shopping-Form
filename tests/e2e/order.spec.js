@@ -60,6 +60,39 @@ test.describe('下單流程', () => {
     await expect(page.locator('#summary-total')).toHaveText('$2,450');
   });
 
+  test('不同品項但同規格可合併折扣', async ({ page }) => {
+    await mockGasApi(page);
+    await page.goto('/');
+    await page.evaluate(() => localStorage.clear());
+    await expect(page.locator('#page-loader')).toBeHidden();
+
+    // 愛文十斤×1 (850) + 金煌十斤×1 (750) = 1600，兩箱十斤折 100 → 1500
+    await page.locator('.product-card').filter({ hasText: '愛文芒果' })
+      .locator('input.spec-check[data-spec="10"]').check();
+    await page.locator('.product-card').filter({ hasText: '金煌芒果' })
+      .locator('input.spec-check[data-spec="10"]').check();
+
+    const discountLine = page.locator('#summary-items .is-discount');
+    await expect(discountLine).toHaveCount(1);
+    await expect(discountLine).toContainText('−$100');
+    await expect(page.locator('#summary-total')).toHaveText('$1,500');
+  });
+
+  test('不同規格不合併折扣', async ({ page }) => {
+    await mockGasApi(page);
+    await page.goto('/');
+    await page.evaluate(() => localStorage.clear());
+    await expect(page.locator('#page-loader')).toBeHidden();
+
+    // 愛文五斤×1 (450) + 愛文十斤×1 (850) = 1300，規格不同 → 不折
+    const aiwen = page.locator('.product-card').filter({ hasText: '愛文芒果' });
+    await aiwen.locator('input.spec-check[data-spec="5"]').check();
+    await aiwen.locator('input.spec-check[data-spec="10"]').check();
+
+    await expect(page.locator('#summary-items .is-discount')).toHaveCount(0);
+    await expect(page.locator('#summary-total')).toHaveText('$1,300');
+  });
+
   test('未填欄位時送出 → 顯示驗證錯誤、不開 modal', async ({ page }) => {
     await mockGasApi(page);
     await page.goto('/');

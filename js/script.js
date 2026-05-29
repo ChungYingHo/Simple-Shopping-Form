@@ -11,8 +11,21 @@
   // fetch timeout（GAS 偶爾會 hang）
   const FETCH_TIMEOUT_MS = 20000;
 
-  // 兩箱折扣：同商品＋同規格，每滿 2 箱折 100（累加）。僅供前端顯示，金額以後端為準。
+  // 兩箱折扣：同規格（不限品項）每滿 2 箱折 100（累加）。僅供前端顯示，金額以後端為準。
   const PAIR_DISCOUNT = 100;
+
+  // 依規格(不限品項)加總箱數計算折扣：每滿 2 箱折 PAIR_DISCOUNT，累加。
+  function computeDiscount(items) {
+    const qtyBySpec = {};
+    items.forEach(function (i) {
+      qtyBySpec[i.spec] = (qtyBySpec[i.spec] || 0) + i.qty;
+    });
+    var discount = 0;
+    Object.keys(qtyBySpec).forEach(function (spec) {
+      discount += Math.floor(qtyBySpec[spec] / 2) * PAIR_DISCOUNT;
+    });
+    return discount;
+  }
 
   // 全域狀態
   let productsData = [];
@@ -354,7 +367,6 @@
         qty: qty,
         price: price,
         amount: price * qty,                      // 折扣前小計
-        discount: Math.floor(qty / 2) * PAIR_DISCOUNT,
       });
     });
     return items;
@@ -378,7 +390,7 @@
 
     const specLabels = { '5': '五斤', '10': '十斤', '20': '二十斤' };
     let subtotal = 0;
-    let discountTotal = 0;
+    const discountTotal = computeDiscount(items);
 
     items.forEach(item => {
       const row = document.createElement('div');
@@ -392,7 +404,6 @@
       row.appendChild(amountSpan);
       itemsEl.appendChild(row);
       subtotal += item.amount;
-      discountTotal += item.discount;
     });
 
     if (discountTotal > 0) {
@@ -524,7 +535,7 @@
     const itemsEl = document.getElementById('confirm-items');
     itemsEl.innerHTML = '';
     let subtotal = 0;
-    let discountTotal = 0;
+    const discountTotal = computeDiscount(data.items);
     data.items.forEach(item => {
       const row = document.createElement('div');
       row.className = 'modal-item';
@@ -538,7 +549,6 @@
       row.appendChild(amount);
       itemsEl.appendChild(row);
       subtotal += item.amount;
-      discountTotal += item.discount;
     });
 
     if (discountTotal > 0) {

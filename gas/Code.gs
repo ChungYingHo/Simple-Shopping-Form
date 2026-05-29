@@ -16,7 +16,7 @@ const MAX_NOTE_LEN = 500;
 const MAX_BANK_CODE_LEN = 10;
 const MAX_ITEMS = 20;
 
-// 兩箱折扣：同商品＋同規格，每滿 2 箱折 100（累加）。
+// 兩箱折扣：同規格（不限品項）每滿 2 箱折 100（累加）。
 // 折扣金額一律以後端為準，前端僅供顯示。
 const PAIR_DISCOUNT = 100;
 
@@ -261,8 +261,8 @@ function createOrder(body) {
 
   // 驗證 items 並計算金額
   const specNameMap = { '5': '五斤', '10': '十斤', '20': '二十斤' };
-  let totalAmount = 0;
   const validatedItems = [];
+  const qtyBySpec = {}; // 依規格(不限品項)加總箱數，用於折扣計算
 
   for (const item of body.items) {
     const product = String(item.product || '').trim().substring(0, MAX_NAME_LEN);
@@ -279,19 +279,34 @@ function createOrder(body) {
       return { success: false, error: '數量不正確：' + product };
     }
 
-    const unitPrice = priceMap[product][spec];
-    // 同商品同規格每滿 2 箱折 PAIR_DISCOUNT（累加），折扣後寫入該列金額。
-    const discount = Math.floor(qty / 2) * PAIR_DISCOUNT;
-    const amount = unitPrice * qty - discount;
-    totalAmount += amount;
+    const gross = priceMap[product][spec] * qty;
+    qtyBySpec[spec] = (qtyBySpec[spec] || 0) + qty;
 
     validatedItems.push({
       product,
+      specKey: spec,
       spec: specNameMap[spec] || spec,
       qty,
-      amount,
+      gross,
+      amount: gross, // 下方分攤折扣後覆寫
     });
   }
+
+  // 同規格（不限品項）每滿 2 箱折 PAIR_DISCOUNT（累加）。
+  // 折扣以規格為單位計算，再分攤到該規格的各列（依序扣抵），讓每列金額加總＝折後總額。
+  for (const specKey in qtyBySpec) {
+    let remaining = Math.floor(qtyBySpec[specKey] / 2) * PAIR_DISCOUNT;
+    if (remaining <= 0) continue;
+    for (const it of validatedItems) {
+      if (it.specKey !== specKey) continue;
+      const take = Math.min(remaining, it.gross);
+      it.amount = it.gross - take;
+      remaining -= take;
+      if (remaining <= 0) break;
+    }
+  }
+
+  const totalAmount = validatedItems.reduce(function (sum, it) { return sum + it.amount; }, 0);
 
   // ----- 上鎖避免並發訂單號碰撞 / 列交錯 -----
   const lock = LockService.getScriptLock();
