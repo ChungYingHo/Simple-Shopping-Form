@@ -799,50 +799,6 @@ textarea.form-input {
   flex-shrink: 0;
 }
 
-/* 物流追蹤 — 改細條 inline 樣式 */
-.track-box {
-  margin: 14px 0 10px;
-  padding: 10px 12px;
-  background: var(--info-bg);
-  border: 1px solid var(--info-border);
-  border-radius: 6px;
-  font-size: 13px;
-  color: var(--text-soft);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.track-box .track-number {
-  margin: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text-soft);
-}
-
-.track-box .track-number .num {
-  font-family: "SF Mono", "Consolas", monospace;
-  font-weight: 700;
-  background: rgba(255, 255, 255, 0.7);
-  padding: 1px 8px;
-  border-radius: 4px;
-  color: var(--text);
-  margin-left: 0;
-  font-size: 13px;
-}
-
-.track-box .track-link {
-  color: var(--info);
-  font-weight: 500;
-  text-decoration: none;
-  border-bottom: 1px solid currentColor;
-  padding-bottom: 1px;
-  font-size: 13px;
-}
-.track-box .track-link:hover { opacity: 0.8; }
-
 /* 合計 */
 .order-card .order-total {
   display: flex;

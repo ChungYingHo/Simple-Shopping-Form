@@ -46,7 +46,7 @@ test.describe('查詢訂單', () => {
     await expect(page.locator('#query-empty')).toBeVisible();
   });
 
-  test('有資料 → 顯示訂單卡片、品項、物流追蹤', async ({ page }) => {
+  test('有資料 → 顯示訂單卡片與品項（不顯示運送編號/物流連結）', async ({ page }) => {
     await mockGasApi(page, {
       queryResponse: { success: true, data: [MASKED_ORDER] },
     });
@@ -67,9 +67,10 @@ test.describe('查詢訂單', () => {
     await expect(card).toContainText('王*明');
     await expect(card).toContainText('台北市大安區****');
 
-    // 物流運送中的品項應顯示運送編號 + 黑貓查詢連結
-    await expect(card).toContainText('TC1234567890');
-    await expect(card.locator('a.track-link')).toHaveAttribute('href', /t-cat\.com\.tw/);
+    // 物流商不固定 → 前台不渲染運送編號與查詢連結
+    await expect(card).not.toContainText('TC1234567890');
+    await expect(card.locator('a.track-link')).toHaveCount(0);
+    await expect(card.locator('.track-box')).toHaveCount(0);
   });
 
   test('整筆訂單品項狀態不同 → 顯示「分批處理中」', async ({ page }) => {

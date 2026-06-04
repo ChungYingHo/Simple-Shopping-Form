@@ -914,38 +914,10 @@
 
     block.appendChild(itemRow);
 
-    // 物流運送中 → 運送資訊
-    if (item.status === '物流運送中') {
-      block.appendChild(renderTrackBox(item.shippingNumber));
-    }
+    // 物流商不固定，故不在頁面顯示運送編號/查詢連結；如需查件請聯絡店家。
+    // shippingNumber 仍由後端維護於 Sheet「運送編號」欄，僅不渲染至前台。
 
     return block;
-  }
-
-  function renderTrackBox(shippingNumber) {
-    const box = document.createElement('div');
-    box.className = 'track-box';
-
-    if (shippingNumber) {
-      const numLine = document.createElement('p');
-      numLine.className = 'track-number';
-      numLine.appendChild(document.createTextNode('運送編號'));
-      const num = document.createElement('span');
-      num.className = 'num';
-      num.textContent = shippingNumber;
-      numLine.appendChild(num);
-      box.appendChild(numLine);
-    }
-
-    const link = document.createElement('a');
-    link.className = 'track-link';
-    link.href = 'https://www.t-cat.com.tw/inquire/trace.aspx';
-    link.target = '_blank';
-    link.rel = 'noopener';
-    link.textContent = '前往黑貓宅急便查詢 →';
-    box.appendChild(link);
-
-    return box;
   }
 
   // ---------- 工具函式 ----------
