@@ -14,9 +14,10 @@ const MAX_PHONE_LEN = 20;
 const MAX_ADDRESS_LEN = 200;
 const MAX_NOTE_LEN = 500;
 const MAX_BANK_CODE_LEN = 10;
-const MAX_ITEMS = 20;
+const MAX_ITEMS = 40; // 分送多人會產生較多列（每收件人各自的品項各佔一列）
 
 // 兩箱折扣：同規格（不限品項）每滿 2 箱折 100（累加）。
+// 折扣以「同一收件人(同地址)」為分組單位：分送不同地址不互相湊折扣（運費各算）。
 // 折扣金額一律以後端為準，前端僅供顯示。
 const PAIR_DISCOUNT = 100;
 
@@ -194,6 +195,10 @@ function queryOrders(phone) {
       amount: amount,
       status: String(row[16]).trim(),
       shippingNumber: String(row[17] == null ? '' : row[17]).trim(),
+      // 收件人逐列附帶（分送多人時各列不同）；前端據此決定要不要分人顯示
+      receiverName: maskName(String(row[5]).trim()),
+      receiverPhone: maskPhone(String(row[6]).trim()),
+      receiverAddress: maskAddress(String(row[7]).trim()),
     });
     ordersMap[orderId].total += amount;
   }
@@ -262,7 +267,6 @@ function createOrder(body) {
   // 驗證 items 並計算金額
   const specNameMap = { '5': '五斤', '10': '十斤', '20': '二十斤' };
   const validatedItems = [];
-  const qtyBySpec = {}; // 依規格(不限品項)加總箱數，用於折扣計算
 
   for (const item of body.items) {
     const product = String(item.product || '').trim().substring(0, MAX_NAME_LEN);
@@ -279,8 +283,15 @@ function createOrder(body) {
       return { success: false, error: '數量不正確：' + product };
     }
 
+    // 收件人：item 自帶則用之（分送多人），否則沿用訂單層級（單一收件人流程不變）。
+    const rcvName = String(item.receiverName || body.receiverName || '').trim().substring(0, MAX_NAME_LEN);
+    const rcvPhone = String(item.receiverPhone || body.receiverPhone || '').trim().substring(0, MAX_PHONE_LEN);
+    const rcvAddress = String(item.receiverAddress || body.receiverAddress || '').trim().substring(0, MAX_ADDRESS_LEN);
+    if (!rcvName || !rcvPhone || !rcvAddress) {
+      return { success: false, error: '收件人資訊不完整' };
+    }
+
     const gross = priceMap[product][spec] * qty;
-    qtyBySpec[spec] = (qtyBySpec[spec] || 0) + qty;
 
     validatedItems.push({
       product,
@@ -289,23 +300,34 @@ function createOrder(body) {
       qty,
       gross,
       amount: gross, // 下方分攤折扣後覆寫
+      receiverName: rcvName,
+      receiverPhone: rcvPhone,
+      receiverAddress: rcvAddress,
+      // 折扣分組鍵：同一收件人(同姓名+電話+地址)才併算兩箱折
+      receiverKey: rcvName + '\x01' + rcvPhone + '\x01' + rcvAddress,
     });
   }
 
-  // 同規格（不限品項）每滿 2 箱折 PAIR_DISCOUNT（累加）。
+  // 同規格每滿 2 箱折 PAIR_DISCOUNT（累加），分組單位＝「同一收件人(同地址)」：
+  // 分送不同地址的箱數不互相湊折扣（運費各算）。單一收件人時全部同組，結果同舊版。
   // 折扣分攤到各列，讓每列金額加總＝折後總額，且每列金額直覺易懂：
   //  (1) 每筆品項先折自己成對的箱數：floor(qty/2)*PAIR_DISCOUNT
-  //  (2) 同規格剩下的單箱（奇數）跨品項兩兩湊對，每湊成一對再折 PAIR_DISCOUNT
+  //  (2) 同收件人同規格剩下的單箱（奇數）跨品項兩兩湊對，每湊成一對再折 PAIR_DISCOUNT
   //      （湊對折扣記在該對中單價較高的一筆，避免折到負值）
-  // 兩步合計 = floor(該規格總箱數 / 2) * PAIR_DISCOUNT（數學恆等）。
+  // 兩步合計 = 各收件人 floor(該規格總箱數 / 2) * PAIR_DISCOUNT 的加總（數學恆等）。
   validatedItems.forEach(function (it) {
     it.amount = it.gross - Math.floor(it.qty / 2) * PAIR_DISCOUNT;
   });
 
-  for (const specKey in qtyBySpec) {
-    const leftovers = validatedItems.filter(function (it) {
-      return it.specKey === specKey && it.qty % 2 === 1;
-    });
+  const leftoverGroups = {}; // key: receiverKey + spec → 該收件人該規格的單箱品項
+  validatedItems.forEach(function (it) {
+    if (it.qty % 2 === 1) {
+      const k = it.receiverKey + '\x01' + it.specKey;
+      (leftoverGroups[k] = leftoverGroups[k] || []).push(it);
+    }
+  });
+  for (const k in leftoverGroups) {
+    const leftovers = leftoverGroups[k];
     const pairs = Math.floor(leftovers.length / 2);
     for (let p = 0; p < pairs; p++) {
       const a = leftovers[2 * p];
@@ -337,25 +359,22 @@ function createOrder(body) {
     const buyerName = String(body.buyerName).trim().substring(0, MAX_NAME_LEN);
     const buyerPhone = String(body.buyerPhone).trim().substring(0, MAX_PHONE_LEN);
     const buyerAddress = String(body.buyerAddress).trim().substring(0, MAX_ADDRESS_LEN);
-    const receiverName = String(body.receiverName).trim().substring(0, MAX_NAME_LEN);
-    const receiverPhone = String(body.receiverPhone).trim().substring(0, MAX_PHONE_LEN);
-    const receiverAddress = String(body.receiverAddress).trim().substring(0, MAX_ADDRESS_LEN);
     const deliveryTime = String(body.deliveryTime || '不指定').trim().substring(0, 10);
     const note = String(body.note || '').trim().substring(0, MAX_NOTE_LEN);
     const paymentMethod = '匯款';
 
     const firstNewRow = orderSheet.getLastRow() + 1;
 
-    // 一次寫入所有列（每筆品項一列）
+    // 一次寫入所有列（每筆品項一列）。收件人逐列各自寫入（分送多人時不同列可不同收件人）。
     const rows = validatedItems.map(item => ([
       orderId,
       timeStr,
       buyerName,
       buyerPhone,
       buyerAddress,
-      receiverName,
-      receiverPhone,
-      receiverAddress,
+      item.receiverName,
+      item.receiverPhone,
+      item.receiverAddress,
       deliveryTime,
       paymentMethod,
       bankCodeRaw,

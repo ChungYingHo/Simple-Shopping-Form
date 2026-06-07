@@ -30,6 +30,9 @@
   // 全域狀態
   let productsData = [];
   let settingsData = {};
+  let pendingSubmit = null;   // 確認 modal 按「確認送出」時呼叫的送出函式（單一 / 分送多人）
+  let recipientSeq = 0;       // 分送多人：收件人卡片流水號（給欄位 id 用）
+  let multiBuilt = false;     // 分送多人分頁是否已建好（首次切過去才建，避免初始就多出商品卡）
 
   // 帶 timeout 的 fetch
   async function fetchWithTimeout(url, options = {}, timeoutMs = FETCH_TIMEOUT_MS) {
@@ -54,12 +57,23 @@
   function setupEventHandlers() {
     // Tabs
     document.getElementById('tab-order').addEventListener('click', () => switchTab('order'));
+    document.getElementById('tab-multi').addEventListener('click', () => switchTab('multi'));
     document.getElementById('tab-query').addEventListener('click', () => switchTab('query'));
 
     // 訂購表單送出 → 開啟確認 modal（不直接送出）
     document.getElementById('order-form').addEventListener('submit', e => {
       e.preventDefault();
       requestConfirm();
+    });
+
+    // 分送多人：表單送出 → 確認 modal
+    document.getElementById('multi-form').addEventListener('submit', e => {
+      e.preventDefault();
+      requestMultiConfirm();
+    });
+    document.getElementById('add-recipient-btn').addEventListener('click', addRecipient);
+    document.querySelectorAll('input[name="multi-mode"]').forEach(r => {
+      r.addEventListener('change', () => { applyMultiMode(); updateMultiSummary(); });
     });
 
     // 查詢表單
@@ -79,7 +93,7 @@
     document.getElementById('confirm-cancel-btn').addEventListener('click', closeConfirmModal);
     document.getElementById('confirm-submit-btn').addEventListener('click', () => {
       closeConfirmModal();
-      submitOrder();
+      if (pendingSubmit) pendingSubmit();
     });
     // 點 overlay 背景關閉
     document.getElementById('confirm-modal').addEventListener('click', e => {
@@ -94,30 +108,34 @@
   // ---------- Tab 切換 ----------
 
   function switchTab(tab) {
-    const orderSection = document.getElementById('section-order');
-    const querySection = document.getElementById('section-query');
-    const successSection = document.getElementById('section-success');
-    const tabOrder = document.getElementById('tab-order');
-    const tabQuery = document.getElementById('tab-query');
+    const map = {
+      order: ['section-order', 'tab-order'],
+      multi: ['section-multi', 'tab-multi'],
+      query: ['section-query', 'tab-query'],
+    };
 
-    successSection.classList.add('hidden');
+    document.getElementById('section-success').classList.add('hidden');
+
+    Object.keys(map).forEach(key => {
+      const [sectionId, tabId] = map[key];
+      const active = key === tab;
+      const section = document.getElementById(sectionId);
+      const tabBtn = document.getElementById(tabId);
+      if (section) section.classList.toggle('hidden', !active);
+      if (tabBtn) {
+        tabBtn.classList.toggle('active', active);
+        tabBtn.setAttribute('aria-selected', active ? 'true' : 'false');
+      }
+    });
 
     if (tab === 'order') {
-      orderSection.classList.remove('hidden');
-      querySection.classList.add('hidden');
-      tabOrder.classList.add('active');
-      tabQuery.classList.remove('active');
-      tabOrder.setAttribute('aria-selected', 'true');
-      tabQuery.setAttribute('aria-selected', 'false');
       updateSummary();
     } else {
-      orderSection.classList.add('hidden');
-      querySection.classList.remove('hidden');
-      tabQuery.classList.add('active');
-      tabOrder.classList.remove('active');
-      tabQuery.setAttribute('aria-selected', 'true');
-      tabOrder.setAttribute('aria-selected', 'false');
       hideFloatingBar();
+      if (tab === 'multi') {
+        ensureMultiBuilt();
+        updateMultiSummary();
+      }
     }
   }
 
@@ -309,20 +327,25 @@
       scarcityEl.classList.remove('hidden');
     }
 
-    // 匯款資訊
+    // 匯款資訊（訂購分頁 + 分送多人分頁共用同一份設定）
     setText('bank-name-display', settingsData.bankName || '-');
     setText('bank-branch-display', settingsData.bankBranch || '');
     setText('bank-account-display', settingsData.accountNumber || '-');
+    setText('multi-bank-name-display', settingsData.bankName || '-');
+    setText('multi-bank-branch-display', settingsData.bankBranch || '');
+    setText('multi-bank-account-display', settingsData.accountNumber || '-');
 
-    const noteEl = document.getElementById('payment-note-display');
-    if (noteEl) {
-      if (settingsData.paymentNote) {
-        noteEl.textContent = settingsData.paymentNote;
+    [['payment-note-display', settingsData.paymentNote],
+     ['multi-payment-note-display', settingsData.paymentNote]].forEach(([id, text]) => {
+      const noteEl = document.getElementById(id);
+      if (!noteEl) return;
+      if (text) {
+        noteEl.textContent = text;
         noteEl.classList.remove('hidden');
       } else {
         noteEl.classList.add('hidden');
       }
-    }
+    });
   }
 
   // ---------- 規格勾選 / 數量 ----------
@@ -356,7 +379,8 @@
 
   function getSelectedItems() {
     const items = [];
-    const checkboxes = document.querySelectorAll('.spec-row input[type="checkbox"]:checked');
+    // 限訂購區：分送多人分頁同樣使用 .spec-row，全域選取會誤抓且無對應 qtyval id
+    const checkboxes = document.querySelectorAll('#products-container .spec-row input[type="checkbox"]:checked');
     checkboxes.forEach(cb => {
       const qtyInput = document.getElementById('qtyval-' + cb.id);
       const qty = parseInt(qtyInput.value, 10) || 1;
@@ -443,26 +467,33 @@
 
   // ---------- localStorage 暫存訂購人資訊 ----------
 
-  function saveBuyerInfo() {
-    const data = {
-      name: document.getElementById('buyer-name').value,
-      phone: document.getElementById('buyer-phone').value,
-      address: document.getElementById('buyer-address').value,
-    };
+  function persistBuyer(name, phone, address) {
     try {
-      localStorage.setItem('mango_buyer', JSON.stringify(data));
+      localStorage.setItem('mango_buyer', JSON.stringify({ name, phone, address }));
     } catch (_) {}
   }
 
+  function saveBuyerInfo() {
+    persistBuyer(
+      document.getElementById('buyer-name').value,
+      document.getElementById('buyer-phone').value,
+      document.getElementById('buyer-address').value
+    );
+  }
+
   function restoreBuyerInfo() {
+    let data;
     try {
-      const data = JSON.parse(localStorage.getItem('mango_buyer'));
-      if (data) {
-        if (data.name) document.getElementById('buyer-name').value = data.name;
-        if (data.phone) document.getElementById('buyer-phone').value = data.phone;
-        if (data.address) document.getElementById('buyer-address').value = data.address;
-      }
-    } catch (_) {}
+      data = JSON.parse(localStorage.getItem('mango_buyer'));
+    } catch (_) { return; }
+    if (!data) return;
+    const setVal = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+    setVal('buyer-name', data.name);
+    setVal('buyer-phone', data.phone);
+    setVal('buyer-address', data.address);
+    setVal('multi-buyer-name', data.name);
+    setVal('multi-buyer-phone', data.phone);
+    setVal('multi-buyer-address', data.address);
   }
 
   // ---------- 收集表單資料 + 驗證 ----------
@@ -525,6 +556,7 @@
       showOrderError(errors.join('、'));
       return;
     }
+    pendingSubmit = submitOrder;
     openConfirmModal(data);
   }
 
@@ -677,6 +709,8 @@
 
   function showSuccess(orderId, total) {
     document.getElementById('section-order').classList.add('hidden');
+    document.getElementById('section-multi').classList.add('hidden');
+    document.getElementById('section-query').classList.add('hidden');
     document.getElementById('section-success').classList.remove('hidden');
     hideFloatingBar();
 
@@ -687,8 +721,8 @@
   }
 
   function resetForm() {
-    // 取消所有勾選
-    document.querySelectorAll('.spec-row input[type="checkbox"]').forEach(cb => {
+    // 取消所有勾選（限訂購區，避免動到分送多人分頁同樣使用 .spec-row 的選單）
+    document.querySelectorAll('#products-container .spec-row input[type="checkbox"]').forEach(cb => {
       cb.checked = false;
       const qtyControl = document.getElementById('qty-' + cb.id);
       if (qtyControl) qtyControl.classList.remove('visible');
@@ -705,6 +739,9 @@
 
     // 重設送貨時段
     document.querySelector('input[name="delivery-time"][value="不指定"]').checked = true;
+
+    // 一併重置分送多人分頁
+    resetMultiForm();
 
     updateSummary();
     switchTab('order');
@@ -933,6 +970,647 @@
   function setText(id, text) {
     const el = document.getElementById(id);
     if (el) el.textContent = text;
+  }
+
+  // ============================================================
+  // 分送多人（multi-recipient）
+  //   一張單 → 多位收件人，逐筆 item 帶各自收件人；折扣每位各算（同舊版邏輯，
+  //   只是分組單位變成「每位收件人」）。後端 createOrder 收到攤平後的 items。
+  // ============================================================
+
+  // 依「商品選單」的勾選讀出品項。scopeEl 限定範圍、scopeClass 區分共用/各卡。
+  function readPickerItems(scopeEl, scopeClass) {
+    const items = [];
+    if (!scopeEl) return items;
+    scopeEl.querySelectorAll('input.' + scopeClass + ':checked').forEach(cb => {
+      const row = cb.closest('.spec-row');
+      const qtyInput = row ? row.querySelector('.qty-input') : null;
+      const qty = qtyInput ? (parseInt(qtyInput.value, 10) || 1) : 1;
+      const price = parseInt(cb.dataset.price, 10) || 0;
+      items.push({
+        product: cb.dataset.product,
+        spec: cb.dataset.spec,
+        qty: qty,
+        price: price,
+        amount: price * qty, // 折扣前小計
+      });
+    });
+    return items;
+  }
+
+  // 通用商品選單建構（與訂購分頁同結構，但用 scopeClass 區分範圍；以 onChange 回呼更新）
+  function buildProductCards(container, scopeClass, onChange) {
+    container.innerHTML = '';
+
+    productsData.forEach(product => {
+      const card = document.createElement('div');
+      card.className = 'product-card' + (product.soldOut ? ' sold-out' : '');
+
+      const title = document.createElement('h3');
+      title.className = 'product-title';
+      title.textContent = product.name;
+      if (product.soldOut) {
+        const badge = document.createElement('span');
+        badge.className = 'sold-badge';
+        badge.textContent = '已售罄';
+        title.appendChild(badge);
+      }
+      card.appendChild(title);
+
+      if (product.soldOut) {
+        const msg = document.createElement('p');
+        msg.className = 'product-hint';
+        msg.textContent = '此商品目前無法訂購';
+        card.appendChild(msg);
+        container.appendChild(card);
+        return;
+      }
+
+      [{ key: '5', label: '五斤' }, { key: '10', label: '十斤' }, { key: '20', label: '二十斤' }]
+        .forEach(spec => {
+          const price = product.prices[spec.key];
+          if (price === undefined || price === null) return;
+
+          const row = document.createElement('div');
+          row.className = 'spec-row';
+
+          const label = document.createElement('label');
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.className = 'spec-check ' + scopeClass;
+          checkbox.dataset.product = product.name;
+          checkbox.dataset.spec = spec.key;
+          checkbox.dataset.price = String(price);
+          label.appendChild(checkbox);
+
+          const nameSpan = document.createElement('span');
+          nameSpan.className = 'spec-name';
+          nameSpan.textContent = spec.label;
+          label.appendChild(nameSpan);
+
+          const priceSpan = document.createElement('span');
+          priceSpan.className = 'spec-price';
+          priceSpan.textContent = '$' + price.toLocaleString();
+          label.appendChild(priceSpan);
+
+          row.appendChild(label);
+
+          const qtyWrap = document.createElement('div');
+          qtyWrap.className = 'qty-control';
+
+          const minusBtn = document.createElement('button');
+          minusBtn.type = 'button';
+          minusBtn.className = 'qty-btn';
+          minusBtn.textContent = '−';
+          minusBtn.setAttribute('aria-label', '減少數量');
+          qtyWrap.appendChild(minusBtn);
+
+          const qtyInput = document.createElement('input');
+          qtyInput.type = 'number';
+          qtyInput.className = 'qty-input';
+          qtyInput.value = '1';
+          qtyInput.min = '1';
+          qtyInput.max = '99';
+          qtyInput.inputMode = 'numeric';
+          qtyWrap.appendChild(qtyInput);
+
+          const plusBtn = document.createElement('button');
+          plusBtn.type = 'button';
+          plusBtn.className = 'qty-btn';
+          plusBtn.textContent = '+';
+          plusBtn.setAttribute('aria-label', '增加數量');
+          qtyWrap.appendChild(plusBtn);
+
+          row.appendChild(qtyWrap);
+
+          checkbox.addEventListener('change', () => {
+            qtyWrap.classList.toggle('visible', checkbox.checked);
+            if (!checkbox.checked) qtyInput.value = '1';
+            onChange();
+          });
+          const bump = delta => {
+            let val = parseInt(qtyInput.value, 10) || 1;
+            val = Math.max(1, Math.min(99, val + delta));
+            qtyInput.value = String(val);
+            onChange();
+          };
+          minusBtn.addEventListener('click', () => bump(-1));
+          plusBtn.addEventListener('click', () => bump(1));
+          qtyInput.addEventListener('change', () => {
+            let val = parseInt(qtyInput.value, 10);
+            if (!val || val < 1) val = 1;
+            if (val > 99) val = 99;
+            qtyInput.value = String(val);
+            onChange();
+          });
+
+          card.appendChild(row);
+        });
+
+      container.appendChild(card);
+    });
+  }
+
+  function getMultiMode() {
+    const el = document.querySelector('input[name="multi-mode"]:checked');
+    return el ? el.value : 'same';
+  }
+
+  // 建一個 .field（label + input），回傳該 field 元素
+  function buildField(labelText, inputClass, type, placeholder, maxlen, id) {
+    const field = document.createElement('div');
+    field.className = 'field';
+
+    const label = document.createElement('label');
+    label.className = 'field-label';
+    label.htmlFor = id;
+    label.appendChild(document.createTextNode(labelText + ' '));
+    const star = document.createElement('span');
+    star.className = 'required';
+    star.textContent = '*';
+    label.appendChild(star);
+
+    const input = document.createElement('input');
+    input.type = type;
+    input.id = id;
+    input.className = 'form-input ' + inputClass;
+    input.placeholder = placeholder;
+    input.maxLength = maxlen;
+
+    field.appendChild(label);
+    field.appendChild(input);
+    return field;
+  }
+
+  function createRecipientCard() {
+    recipientSeq += 1;
+    const seq = recipientSeq;
+
+    const card = document.createElement('section');
+    card.className = 'recipient-card';
+
+    const head = document.createElement('div');
+    head.className = 'recipient-head';
+    const title = document.createElement('span');
+    title.className = 'recipient-title';
+    head.appendChild(title);
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'recipient-remove';
+    removeBtn.textContent = '移除';
+    removeBtn.addEventListener('click', () => removeRecipient(card));
+    head.appendChild(removeBtn);
+    card.appendChild(head);
+
+    const nameField = buildField('收件人姓名', 'rcp-name', 'text', '請輸入收件人姓名', 50, 'rcp-name-' + seq);
+    card.appendChild(nameField);
+    card.appendChild(buildField('收件人電話', 'rcp-phone', 'tel', '例：0912345678', 20, 'rcp-phone-' + seq));
+    card.appendChild(buildField('收件地址', 'rcp-address', 'text', '請輸入收件地址', 200, 'rcp-address-' + seq));
+
+    // 姓名變動 → 摘要列即時帶名字
+    const nameInput = nameField.querySelector('.rcp-name');
+    if (nameInput) nameInput.addEventListener('input', updateMultiSummary);
+
+    // 各自挑商品（custom 模式才顯示）
+    const products = document.createElement('div');
+    products.className = 'rcp-products';
+    const plabel = document.createElement('p');
+    plabel.className = 'rcp-products-label';
+    plabel.textContent = '這位收件人的商品';
+    products.appendChild(plabel);
+    const pcontainer = document.createElement('div');
+    pcontainer.className = 'rcp-products-container';
+    products.appendChild(pcontainer);
+    card.appendChild(products);
+    buildProductCards(pcontainer, 'rcp-spec-check', updateMultiSummary);
+
+    // 小計
+    const subtotal = document.createElement('div');
+    subtotal.className = 'rcp-subtotal hidden';
+    const slabel = document.createElement('span');
+    slabel.className = 'label';
+    slabel.appendChild(document.createTextNode('小計 '));
+    const note = document.createElement('span');
+    note.className = 'discount-note';
+    slabel.appendChild(note);
+    const samount = document.createElement('span');
+    samount.className = 'amount';
+    samount.textContent = '$0';
+    subtotal.appendChild(slabel);
+    subtotal.appendChild(samount);
+    card.appendChild(subtotal);
+
+    return card;
+  }
+
+  function renumberRecipients() {
+    const cards = document.querySelectorAll('#recipients-container .recipient-card');
+    cards.forEach((card, i) => {
+      const title = card.querySelector('.recipient-title');
+      if (title) title.textContent = '收件人 ' + (i + 1);
+      const removeBtn = card.querySelector('.recipient-remove');
+      if (removeBtn) removeBtn.disabled = cards.length <= 1; // 至少留一位
+    });
+  }
+
+  function addRecipient() {
+    const container = document.getElementById('recipients-container');
+    if (!container) return;
+    container.appendChild(createRecipientCard());
+    renumberRecipients();
+    applyMultiMode();
+    updateMultiSummary();
+  }
+
+  function removeRecipient(card) {
+    const container = document.getElementById('recipients-container');
+    if (!container) return;
+    if (container.querySelectorAll('.recipient-card').length <= 1) return;
+    card.remove();
+    renumberRecipients();
+    updateMultiSummary();
+  }
+
+  // 切換「大家都一樣 / 每人各自挑」的顯示
+  function applyMultiMode() {
+    const same = getMultiMode() === 'same';
+    const sharedWrap = document.getElementById('multi-shared-wrap');
+    if (sharedWrap) sharedWrap.classList.toggle('hidden', !same);
+    document.querySelectorAll('#recipients-container .rcp-products').forEach(el => {
+      el.classList.toggle('hidden', same);
+    });
+    const hint = document.getElementById('multi-mode-hint');
+    if (hint) {
+      hint.textContent = same
+        ? '挑一次商品，每位收件人都收到同一份；每張卡只要填地址即可。'
+        : '每位收件人各自挑選自己的商品（可不一樣）。';
+    }
+  }
+
+  // 重算每位收件人小計 + 整單摘要
+  function updateMultiSummary() {
+    const itemsEl = document.getElementById('multi-summary-items');
+    const summaryEl = document.getElementById('multi-summary');
+    const totalEl = document.getElementById('multi-summary-total');
+    if (!itemsEl || !summaryEl || !totalEl) return;
+
+    const mode = getMultiMode();
+    const sharedItems = readPickerItems(document.getElementById('multi-shared-container'), 'shared-spec-check');
+    const cards = Array.from(document.querySelectorAll('#recipients-container .recipient-card'));
+
+    itemsEl.innerHTML = '';
+    let grandGross = 0;
+    let grandDiscount = 0;
+    let anyItems = false;
+
+    cards.forEach((card, idx) => {
+      const items = mode === 'same' ? sharedItems : readPickerItems(card, 'rcp-spec-check');
+      const gross = items.reduce((s, it) => s + it.amount, 0);
+      const discount = computeDiscount(items);
+      const net = gross - discount;
+      if (items.length > 0) anyItems = true;
+      grandGross += gross;
+      grandDiscount += discount;
+
+      // 卡內小計
+      const sub = card.querySelector('.rcp-subtotal');
+      if (sub) {
+        sub.classList.toggle('hidden', items.length === 0);
+        const amt = sub.querySelector('.amount');
+        if (amt) amt.textContent = '$' + net.toLocaleString();
+        const dnote = sub.querySelector('.discount-note');
+        if (dnote) dnote.textContent = discount > 0 ? '（折 −$' + discount.toLocaleString() + '）' : '';
+      }
+
+      // 摘要列（每位一列）
+      const nameInput = card.querySelector('.rcp-name');
+      const name = nameInput ? nameInput.value.trim() : '';
+      const count = items.reduce((s, it) => s + it.qty, 0);
+      const line = document.createElement('div');
+      line.className = 'summary-line';
+      const labelSpan = document.createElement('span');
+      labelSpan.textContent = '收件人 ' + (idx + 1) + (name ? '（' + name + '）' : '') + ' ×' + count + ' 箱';
+      const amountSpan = document.createElement('span');
+      amountSpan.className = 'summary-line-amount';
+      amountSpan.textContent = '$' + gross.toLocaleString();
+      line.appendChild(labelSpan);
+      line.appendChild(amountSpan);
+      itemsEl.appendChild(line);
+    });
+
+    if (grandDiscount > 0) {
+      const line = document.createElement('div');
+      line.className = 'summary-line is-discount';
+      const labelSpan = document.createElement('span');
+      labelSpan.textContent = '兩箱折扣（各收件人合計）';
+      const amountSpan = document.createElement('span');
+      amountSpan.className = 'summary-line-amount';
+      amountSpan.textContent = '−$' + grandDiscount.toLocaleString();
+      line.appendChild(labelSpan);
+      line.appendChild(amountSpan);
+      itemsEl.appendChild(line);
+    }
+
+    totalEl.textContent = '$' + (grandGross - grandDiscount).toLocaleString();
+    summaryEl.classList.toggle('hidden', !anyItems);
+  }
+
+  function collectMultiData() {
+    const mode = getMultiMode();
+    const sharedItems = readPickerItems(document.getElementById('multi-shared-container'), 'shared-spec-check');
+    const cards = Array.from(document.querySelectorAll('#recipients-container .recipient-card'));
+
+    const recipients = cards.map(card => {
+      const val = sel => {
+        const el = card.querySelector(sel);
+        return el ? el.value.trim() : '';
+      };
+      const items = mode === 'same'
+        ? sharedItems.map(it => Object.assign({}, it))
+        : readPickerItems(card, 'rcp-spec-check');
+      return {
+        name: val('.rcp-name'),
+        phone: val('.rcp-phone'),
+        address: val('.rcp-address'),
+        items: items,
+      };
+    });
+
+    const deliveryEl = document.querySelector('input[name="multi-delivery-time"]:checked');
+
+    return {
+      mode,
+      buyerName: document.getElementById('multi-buyer-name').value.trim(),
+      buyerPhone: document.getElementById('multi-buyer-phone').value.trim(),
+      buyerAddress: document.getElementById('multi-buyer-address').value.trim(),
+      recipients,
+      deliveryTime: deliveryEl ? deliveryEl.value : '不指定',
+      bankCode: document.getElementById('multi-bank-code').value.trim(),
+      note: document.getElementById('multi-order-note').value.trim(),
+    };
+  }
+
+  function validateMultiData(data) {
+    const errors = [];
+    if (!data.buyerName) errors.push('請填寫訂購人姓名');
+    if (!data.buyerPhone) errors.push('請填寫訂購人電話');
+    if (!data.buyerAddress) errors.push('請填寫訂購人地址');
+
+    if (data.recipients.length === 0) {
+      errors.push('請至少新增一位收件人');
+    }
+    data.recipients.forEach((r, i) => {
+      const tag = '收件人 ' + (i + 1);
+      if (!r.name) errors.push(tag + '：請填姓名');
+      if (!r.phone) errors.push(tag + '：請填電話');
+      if (!r.address) errors.push(tag + '：請填地址');
+      if (data.mode === 'custom' && r.items.length === 0) errors.push(tag + '：請選擇商品');
+    });
+
+    if (data.mode === 'same') {
+      const shared = readPickerItems(document.getElementById('multi-shared-container'), 'shared-spec-check');
+      if (shared.length === 0) errors.push('請先在上方挑選要分送的商品');
+    }
+
+    // 總列數對齊後端 MAX_ITEMS（40）
+    const totalItems = data.recipients.reduce((s, r) => s + r.items.length, 0);
+    if (totalItems > 40) errors.push('品項列數過多（最多 40 列），請拆成兩張單');
+
+    if (!data.bankCode) errors.push('請先完成匯款，並填寫匯款後五碼');
+    else if (!/^\d{5}$/.test(data.bankCode)) errors.push('匯款後五碼需為 5 位數字');
+
+    return errors;
+  }
+
+  function showMultiError(message) {
+    const errorEl = document.getElementById('multi-order-error');
+    errorEl.textContent = message;
+    errorEl.classList.remove('hidden');
+    errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  function requestMultiConfirm() {
+    document.getElementById('multi-order-error').classList.add('hidden');
+    const data = collectMultiData();
+    const errors = validateMultiData(data);
+    if (errors.length > 0) {
+      showMultiError(errors.join('、'));
+      return;
+    }
+    pendingSubmit = submitMultiOrder;
+    openMultiConfirmModal(data);
+  }
+
+  function openMultiConfirmModal(data) {
+    const specLabels = { '5': '五斤', '10': '十斤', '20': '二十斤' };
+    const itemsEl = document.getElementById('confirm-items');
+    itemsEl.innerHTML = '';
+
+    let grand = 0;
+    data.recipients.forEach((r, idx) => {
+      const block = document.createElement('div');
+      block.className = 'modal-recipient';
+
+      const nameP = document.createElement('p');
+      nameP.className = 'modal-recipient-name';
+      nameP.textContent = '收件人 ' + (idx + 1) + '：' + r.name + '（' + r.phone + '）';
+      block.appendChild(nameP);
+
+      const addrP = document.createElement('p');
+      addrP.className = 'modal-recipient-addr';
+      addrP.textContent = r.address;
+      block.appendChild(addrP);
+
+      r.items.forEach(it => {
+        const row = document.createElement('div');
+        row.className = 'modal-item';
+        const name = document.createElement('span');
+        name.className = 'name';
+        name.textContent = it.product + ' ' + (specLabels[it.spec] || it.spec) + ' ×' + it.qty + ' (箱)';
+        const amount = document.createElement('span');
+        amount.className = 'amount';
+        amount.textContent = '$' + it.amount.toLocaleString();
+        row.appendChild(name);
+        row.appendChild(amount);
+        block.appendChild(row);
+      });
+
+      const gross = r.items.reduce((s, it) => s + it.amount, 0);
+      const discount = computeDiscount(r.items);
+      const net = gross - discount;
+      grand += net;
+
+      const subRow = document.createElement('div');
+      subRow.className = 'modal-item modal-subtotal';
+      const subName = document.createElement('span');
+      subName.className = 'name';
+      subName.textContent = discount > 0 ? '小計（折 −$' + discount.toLocaleString() + '）' : '小計';
+      const subAmount = document.createElement('span');
+      subAmount.className = 'amount';
+      subAmount.textContent = '$' + net.toLocaleString();
+      subRow.appendChild(subName);
+      subRow.appendChild(subAmount);
+      block.appendChild(subRow);
+
+      itemsEl.appendChild(block);
+    });
+
+    setText('confirm-total', '$' + grand.toLocaleString());
+    fillModalLines('confirm-buyer', [data.buyerName, data.buyerPhone, data.buyerAddress]);
+    fillModalLines('confirm-receiver', ['分送 ' + data.recipients.length + ' 位收件人（明細見上方品項）']);
+    setText('confirm-delivery', data.deliveryTime);
+    setText('confirm-bank-code', data.bankCode);
+
+    const noteSection = document.getElementById('confirm-note-section');
+    if (data.note) {
+      setText('confirm-note', data.note);
+      noteSection.classList.remove('hidden');
+    } else {
+      noteSection.classList.add('hidden');
+    }
+
+    const modal = document.getElementById('confirm-modal');
+    modal.classList.add('show');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    setTimeout(() => document.getElementById('confirm-cancel-btn').focus(), 50);
+  }
+
+  async function submitMultiOrder() {
+    const errorEl = document.getElementById('multi-order-error');
+    errorEl.classList.add('hidden');
+
+    const data = collectMultiData();
+    const errors = validateMultiData(data);
+    if (errors.length > 0) {
+      showMultiError(errors.join('、'));
+      return;
+    }
+
+    const btn = document.getElementById('multi-submit-btn');
+    btn.classList.add('btn-loading');
+    btn.disabled = true;
+    showSubmitLoader();
+
+    // 攤平：每位收件人的每個品項各一筆，逐筆附上該收件人資訊
+    const items = [];
+    data.recipients.forEach(r => {
+      r.items.forEach(it => {
+        items.push({
+          product: it.product,
+          spec: it.spec,
+          qty: it.qty,
+          receiverName: r.name,
+          receiverPhone: r.phone,
+          receiverAddress: r.address,
+        });
+      });
+    });
+
+    const first = data.recipients[0];
+    const payload = {
+      action: 'order',
+      buyerName: data.buyerName,
+      buyerPhone: data.buyerPhone,
+      buyerAddress: data.buyerAddress,
+      // 後端必填欄位回退用第一位收件人；真正依據是逐筆 items 各自帶的收件人
+      receiverName: first.name,
+      receiverPhone: first.phone,
+      receiverAddress: first.address,
+      deliveryTime: data.deliveryTime,
+      bankCode: data.bankCode,
+      note: data.note,
+      items: items,
+    };
+
+    try {
+      const res = await fetchWithTimeout(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' }, // 同訂購流程，避開 CORS preflight
+        body: JSON.stringify(payload),
+        redirect: 'follow',
+      });
+      const json = await res.json();
+
+      if (!json.success) throw new Error(json.error || '送出失敗');
+
+      persistBuyer(data.buyerName, data.buyerPhone, data.buyerAddress);
+      showSuccess(json.orderId, json.total);
+    } catch (err) {
+      console.error('送出分送訂單失敗:', err);
+      showMultiError(err.name === 'AbortError'
+        ? '送出逾時，請稍後再試'
+        : (err.message || '送出失敗，請稍後再試'));
+    } finally {
+      hideSubmitLoader();
+      btn.classList.remove('btn-loading');
+      btn.disabled = false;
+    }
+  }
+
+  // 取消某商品選單的所有勾選（重置用）
+  function clearPicker(scopeEl, scopeClass) {
+    if (!scopeEl) return;
+    scopeEl.querySelectorAll('input.' + scopeClass + ':checked').forEach(cb => {
+      cb.checked = false;
+      const row = cb.closest('.spec-row');
+      if (row) {
+        const qc = row.querySelector('.qty-control');
+        if (qc) qc.classList.remove('visible');
+        const qi = row.querySelector('.qty-input');
+        if (qi) qi.value = '1';
+      }
+    });
+  }
+
+  function resetMultiForm() {
+    if (!multiBuilt) return; // 分送多人分頁尚未開啟過，無需重置
+    const noteEl = document.getElementById('multi-order-note');
+    if (noteEl) noteEl.value = '';
+    const codeEl = document.getElementById('multi-bank-code');
+    if (codeEl) codeEl.value = '';
+
+    clearPicker(document.getElementById('multi-shared-container'), 'shared-spec-check');
+
+    const container = document.getElementById('recipients-container');
+    if (container) {
+      container.innerHTML = '';
+      recipientSeq = 0;
+      container.appendChild(createRecipientCard());
+      renumberRecipients();
+    }
+
+    const sameRadio = document.querySelector('input[name="multi-mode"][value="same"]');
+    if (sameRadio) sameRadio.checked = true;
+    const defaultDelivery = document.querySelector('input[name="multi-delivery-time"][value="不指定"]');
+    if (defaultDelivery) defaultDelivery.checked = true;
+    const errEl = document.getElementById('multi-order-error');
+    if (errEl) errEl.classList.add('hidden');
+
+    applyMultiMode();
+    updateMultiSummary();
+  }
+
+  // 首次切到分送多人分頁時才建（商品已載入才建，避免初始就在隱藏分頁多出商品卡）
+  function ensureMultiBuilt() {
+    if (multiBuilt) return;
+    if (!productsData || productsData.length === 0) return; // 商品尚未載入，待下次切換再建
+    initMultiTab();
+    multiBuilt = true;
+  }
+
+  // 初始化分送多人分頁（建共用商品選單 + 第一張收件人卡）
+  function initMultiTab() {
+    const sharedContainer = document.getElementById('multi-shared-container');
+    if (sharedContainer) buildProductCards(sharedContainer, 'shared-spec-check', updateMultiSummary);
+
+    const container = document.getElementById('recipients-container');
+    if (container && container.querySelectorAll('.recipient-card').length === 0) {
+      container.appendChild(createRecipientCard());
+      renumberRecipients();
+    }
+    applyMultiMode();
+    updateMultiSummary();
   }
 
 })();

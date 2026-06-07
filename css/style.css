@@ -1258,3 +1258,131 @@ textarea.form-input {
   border-top: 1px solid var(--border-soft);
 }
 .modal-footer .btn { flex: 1; }
+
+/* ============================================================
+   分送多人（multi-recipient）
+   ============================================================ */
+
+/* 三分頁時 tab 收窄一點，小螢幕才放得下 */
+@media (max-width: 480px) {
+  .tab-btn {
+    min-width: 0;
+    padding: 10px 14px;
+    font-size: 13.5px;
+    letter-spacing: 0.02em;
+  }
+}
+
+.recipients { display: flex; flex-direction: column; gap: 14px; }
+
+.recipient-card {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+}
+
+.recipient-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.recipient-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--mango-dark);
+  letter-spacing: 0.06em;
+}
+
+.recipient-remove {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.04em;
+  transition: color 0.15s, background 0.15s;
+}
+.recipient-remove:hover { color: var(--danger); background: var(--danger-bg); }
+.recipient-remove:disabled { opacity: 0; pointer-events: none; }
+
+/* 每人各自挑：卡內商品選擇 */
+.rcp-products { margin-top: 6px; }
+
+.rcp-products-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  margin: 4px 0 8px;
+}
+
+/* 卡內商品卡片去掉陰影/縮減內距，融入收件人卡 */
+.rcp-products .product-card {
+  border: 1px solid var(--border-soft);
+  box-shadow: none;
+  padding: 12px 14px 6px;
+}
+.rcp-products .product-card + .product-card { margin-top: 8px; }
+
+/* 收件人小計 */
+.rcp-subtotal {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13.5px;
+  color: var(--text-soft);
+}
+.rcp-subtotal .amount {
+  font-weight: 700;
+  color: var(--mango-dark);
+  font-family: var(--font-display);
+  font-size: 16px;
+  white-space: nowrap;
+}
+.rcp-subtotal .discount-note {
+  color: var(--success);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+#multi-shared-wrap { margin-top: 14px; }
+
+/* modal 內分收件人小標 */
+.modal-recipient {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+.modal-recipient:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+
+.modal-recipient-name {
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--mango-dark);
+  letter-spacing: 0.04em;
+  margin: 0 0 2px;
+}
+.modal-recipient-addr {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin: 0 0 6px;
+  word-break: break-all;
+}
+
+.modal-item.modal-subtotal {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+.modal-item.modal-subtotal .amount { color: var(--mango-dark); }

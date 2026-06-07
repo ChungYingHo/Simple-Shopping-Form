@@ -45,6 +45,7 @@
     <nav class="tabs-wrap">
       <div class="tabs" role="tablist">
         <button id="tab-order" class="tab-btn active" type="button" role="tab" aria-selected="true" aria-controls="section-order">訂購</button>
+        <button id="tab-multi" class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="section-multi">分送多人</button>
         <button id="tab-query" class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="section-query">查詢訂單</button>
       </div>
     </nav>
@@ -70,7 +71,7 @@
           <span class="promo-icon" aria-hidden="true">🎁</span>
           <p class="promo-text">
             <strong>同規格每滿 2 箱現折 $100</strong>（不限品項，可累加；例：3 箱折 $100、4 箱折 $200）。
-            折扣需寄送<strong>同一地址</strong>；若要分寄不同地址，請<strong>分開下單</strong>。
+            折扣需寄送<strong>同一地址</strong>；若要分寄不同地址，請改用上方「<strong>分送多人</strong>」。
           </p>
         </div>
 
@@ -175,7 +176,7 @@
         <!-- 備註 -->
         <section class="card">
           <h3 class="card-title"><span class="step-num">5</span>備註</h3>
-          <p class="note-hint">小提醒：一張訂單只會寄送到上方同一個地址。若需分寄不同地址，填在備註是沒用的喔，請分開下單。</p>
+          <p class="note-hint">小提醒：這張訂單只會寄到上方同一個地址。若要一次寄給多位不同收件人，請改用上方「分送多人」分頁。</p>
           <textarea id="order-note" class="form-input" rows="3" placeholder="有什麼想跟我們說的嗎？（選填）" maxlength="500"></textarea>
         </section>
 
@@ -188,6 +189,132 @@
         </button>
       </form>
     </main>
+
+    <!-- ==================== 分送多人區 ==================== -->
+    <section id="section-multi" class="hidden section" role="tabpanel" aria-labelledby="tab-multi">
+
+      <div class="promo-note">
+        <span class="promo-icon" aria-hidden="true">🎁</span>
+        <p class="promo-text">
+          <strong>一張單、一次匯款，分寄給多位收件人。</strong>
+          每位收件人各自一個地址、運費各算；兩箱折扣以「<strong>同一位收件人</strong>」為單位計算（分送不同地址不互相合併）。
+        </p>
+      </div>
+
+      <form id="multi-form" class="section-stack mt-14" novalidate>
+
+        <!-- 商品怎麼分 -->
+        <section class="card">
+          <h3 class="card-title"><span class="step-num">1</span>商品怎麼分？</h3>
+          <div class="radio-group" role="radiogroup" aria-label="商品分配方式">
+            <label class="radio-card">
+              <input type="radio" name="multi-mode" value="same" checked class="hidden peer">
+              <span class="radio-label">大家都一樣</span>
+            </label>
+            <label class="radio-card">
+              <input type="radio" name="multi-mode" value="custom" class="hidden peer">
+              <span class="radio-label">每人各自挑</span>
+            </label>
+          </div>
+          <p class="note-hint mt-14" id="multi-mode-hint"></p>
+
+          <!-- 共用商品（「大家都一樣」模式） -->
+          <div id="multi-shared-wrap">
+            <div id="multi-shared-container" class="section-stack"></div>
+          </div>
+        </section>
+
+        <!-- 訂購人 -->
+        <section class="card">
+          <h3 class="card-title"><span class="step-num">2</span>訂購人（付款人）</h3>
+          <div class="field">
+            <label for="multi-buyer-name" class="field-label">姓名 <span class="required">*</span></label>
+            <input type="text" id="multi-buyer-name" class="form-input" placeholder="請輸入姓名" autocomplete="name" maxlength="50">
+          </div>
+          <div class="field">
+            <label for="multi-buyer-phone" class="field-label">電話 <span class="required">*</span></label>
+            <input type="tel" id="multi-buyer-phone" class="form-input" placeholder="例：0912345678" autocomplete="tel" maxlength="20">
+          </div>
+          <div class="field">
+            <label for="multi-buyer-address" class="field-label">地址 <span class="required">*</span></label>
+            <input type="text" id="multi-buyer-address" class="form-input" placeholder="請輸入地址" autocomplete="street-address" maxlength="200">
+          </div>
+          <p class="note-hint" style="margin:10px 0 0;">日後查詢這張訂單，以訂購人電話為準。</p>
+        </section>
+
+        <!-- 收件人清單 -->
+        <section class="card">
+          <h3 class="card-title"><span class="step-num">3</span>收件人清單</h3>
+          <div id="recipients-container" class="recipients"></div>
+          <button type="button" id="add-recipient-btn" class="btn btn-ghost btn-block mt-14">＋ 新增收件人</button>
+        </section>
+
+        <!-- 送貨時段 -->
+        <section class="card">
+          <h3 class="card-title"><span class="step-num">4</span>送貨時段</h3>
+          <div class="radio-group">
+            <label class="radio-card">
+              <input type="radio" name="multi-delivery-time" value="不指定" checked class="hidden peer">
+              <span class="radio-label">不指定</span>
+            </label>
+            <label class="radio-card">
+              <input type="radio" name="multi-delivery-time" value="上午" class="hidden peer">
+              <span class="radio-label">上午</span>
+            </label>
+            <label class="radio-card">
+              <input type="radio" name="multi-delivery-time" value="下午" class="hidden peer">
+              <span class="radio-label">下午</span>
+            </label>
+          </div>
+          <p class="delivery-hint">整張單共用一個時段設定。實際送達時間仍依物流安排為準，敬請見諒。</p>
+        </section>
+
+        <!-- 付款方式 -->
+        <section class="card">
+          <h3 class="card-title"><span class="step-num">5</span>付款方式</h3>
+          <div class="payment-flow-notice">
+            <span class="flow-icon" aria-hidden="true">💡</span>
+            <p class="flow-text">
+              請先依下方資訊<strong>完成匯款（整張單一次匯齊）</strong>，再<strong>填寫匯款後五碼並送出訂單</strong>，我們會核對款項後安排出貨～
+            </p>
+          </div>
+          <div class="bank-box no-top-gap">
+            <h4>匯款帳號</h4>
+            <p>銀行：<span id="multi-bank-name-display">-</span> <span id="multi-bank-branch-display"></span></p>
+            <p>帳號：<span id="multi-bank-account-display">-</span></p>
+            <p id="multi-payment-note-display" class="bank-note hidden"></p>
+            <p class="bank-reminder">小提醒：匯款金額請以下方「合計」為準唷 ☺</p>
+            <div class="field">
+              <label for="multi-bank-code" class="field-label">匯款後五碼 <span class="required">*</span></label>
+              <input type="tel" id="multi-bank-code" class="form-input" placeholder="完成匯款後，請填入帳號末五碼" maxlength="5" inputmode="numeric" pattern="\d{5}">
+            </div>
+          </div>
+        </section>
+
+        <!-- 備註 -->
+        <section class="card">
+          <h3 class="card-title"><span class="step-num">6</span>備註</h3>
+          <textarea id="multi-order-note" class="form-input" rows="3" placeholder="有什麼想跟我們說的嗎？（選填）" maxlength="500"></textarea>
+        </section>
+
+        <!-- 摘要 -->
+        <div id="multi-summary" class="hidden mt-20">
+          <div class="summary-card">
+            <p class="summary-title">訂單摘要</p>
+            <div id="multi-summary-items" class="summary-items"></div>
+            <div class="summary-total">
+              <span class="label">合計</span>
+              <span id="multi-summary-total" class="amount">$0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 錯誤訊息 -->
+        <div id="multi-order-error" class="hidden alert alert-error mt-14" role="alert" aria-live="polite"></div>
+
+        <button id="multi-submit-btn" type="submit" class="btn btn-primary btn-block btn-lg mt-24">送出訂單</button>
+      </form>
+    </section>
 
     <!-- ==================== 訂單成功 ==================== -->
     <div id="section-success" class="hidden section">
